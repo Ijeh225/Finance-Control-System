@@ -30,18 +30,30 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  req.session.userId = user.id;
-  req.session.userRole = user.role;
-  req.session.userName = user.name;
-  req.session.userEmail = user.email ?? "";
+  // Regenerate session ID after login to prevent session fixation attacks.
+  const userPayload = {
+    id: user.id,
+    name: user.name,
+    role: user.role as "md" | "treasury" | "payment_assistant",
+    email: user.email ?? "",
+  };
 
-  res.json({
-    user: {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      email: user.email,
-    },
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: "Session error" });
+      return;
+    }
+    req.session.userId = userPayload.id;
+    req.session.userRole = userPayload.role;
+    req.session.userName = userPayload.name;
+    req.session.userEmail = userPayload.email;
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        res.status(500).json({ error: "Session save error" });
+        return;
+      }
+      res.json({ user: userPayload });
+    });
   });
 });
 

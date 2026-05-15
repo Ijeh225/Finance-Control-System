@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -41,6 +42,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace("/(tabs)");
     }
   }, [user, isLoading, segments]);
+
+  // Hold all app routes until the session check completes to prevent flash of
+  // authenticated content for unauthenticated users.
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0A0F1E", alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color="#C9A84C" size="large" />
+      </View>
+    );
+  }
 
   return <>{children}</>;
 }
