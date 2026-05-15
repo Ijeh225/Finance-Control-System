@@ -118,6 +118,12 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
       return { ok: false, status: 403, error: "You can only transfer from your own wallet" };
     }
 
+    // Non-MD: destination must also be a wallet the actor owns.
+    // Prevents leaking metadata of unrelated wallets via the transfer response.
+    if (actor.role !== "md" && toWallet.ownedBy !== actor.id) {
+      return { ok: false, status: 403, error: "You can only transfer to your own wallet" };
+    }
+
     const fromBalance = parseFloat(fromWallet.balance);
     const toBalance   = parseFloat(toWallet.balance);
 
@@ -238,8 +244,8 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
     return;
   }
 
-  const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")));
-  const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query["pageSize"] ?? "50"))));
+  const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query["pageSize"] ?? "50")) || 50));
   const offset = (page - 1) * pageSize;
 
   const [{ count }] = await db
