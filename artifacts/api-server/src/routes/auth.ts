@@ -32,6 +32,8 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   req.session.userId = user.id;
   req.session.userRole = user.role;
+  req.session.userName = user.name;
+  req.session.userEmail = user.email ?? "";
 
   res.json({
     user: {
@@ -50,30 +52,13 @@ router.post("/auth/logout", (req, res): void => {
   });
 });
 
-router.get("/auth/me", async (req, res): Promise<void> => {
-  if (!req.session?.userId) {
+router.get("/auth/me", (req, res): void => {
+  const { userId, userName, userRole, userEmail } = req.session ?? {};
+  if (!userId || !userName || !userRole || !userEmail) {
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
-
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, req.session.userId))
-    .limit(1);
-
-  if (!user) {
-    req.session.destroy(() => {});
-    res.status(401).json({ error: "User not found" });
-    return;
-  }
-
-  res.json({
-    id: user.id,
-    name: user.name,
-    role: user.role,
-    email: user.email,
-  });
+  res.json({ id: userId, name: userName, role: userRole, email: userEmail });
 });
 
 export default router;

@@ -8,14 +8,26 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
+const safeUserColumns = {
+  id: usersTable.id,
+  name: usersTable.name,
+  role: usersTable.role,
+  email: usersTable.email,
+  phone: usersTable.phone,
+  createdAt: usersTable.createdAt,
+} as const;
+
 router.get("/users", async (_req, res): Promise<void> => {
-  const users = await db.select().from(usersTable);
+  const users = await db.select(safeUserColumns).from(usersTable);
   res.json({ users });
 });
 
 router.get("/users/:id", async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, rawId!));
+  const [user] = await db
+    .select(safeUserColumns)
+    .from(usersTable)
+    .where(eq(usersTable.id, rawId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
   res.json(user);
 });
@@ -23,8 +35,11 @@ router.get("/users/:id", async (req, res): Promise<void> => {
 router.post("/users", async (req, res): Promise<void> => {
   const { name, role, email, phone } = req.body;
   if (!name || !role) { res.status(400).json({ error: "name and role are required" }); return; }
-  const [user] = await db.insert(usersTable).values({ id: uid(), name, role, email, phone }).returning();
-  res.status(201).json(user);
+  const [inserted] = await db
+    .insert(usersTable)
+    .values({ id: uid(), name, role, email, phone })
+    .returning({ id: usersTable.id, name: usersTable.name, role: usersTable.role, email: usersTable.email, phone: usersTable.phone });
+  res.status(201).json(inserted);
 });
 
 export default router;

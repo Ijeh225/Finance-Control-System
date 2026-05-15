@@ -12,7 +12,6 @@ export default function WalletsScreen() {
   const insets = useSafeAreaInsets();
 
   const { data: walletsData, isLoading: isWalletsLoading } = useListWallets(
-    undefined,
     { query: { queryKey: getListWalletsQueryKey() } }
   );
 

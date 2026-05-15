@@ -30,7 +30,7 @@ export default function AlertsScreen() {
   };
 
   const handleMarkAllRead = () => {
-    markAllRead({ userId: 'md' }, { onSuccess: () => refetch() });
+    markAllRead({ data: { userId: 'md' } }, { onSuccess: () => refetch() });
   };
 
   const handleNotificationPress = (notification: any) => {

@@ -41,19 +41,19 @@ export default function BillDetailScreen() {
 
     try {
       if (actionId === 'approve') {
-        await approveMutation.mutateAsync({ billId: id, data: { comment } });
+        await approveMutation.mutateAsync({ id: id as string, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'partial' && amount) {
-        await partialMutation.mutateAsync({ billId: id, data: { comment, approvedAmount: amount } });
+        await partialMutation.mutateAsync({ id: id as string, data: { comment, approvedAmount: amount } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'reject') {
-        await rejectMutation.mutateAsync({ billId: id, data: { comment } });
+        await rejectMutation.mutateAsync({ id: id as string, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } else if (actionId === 'hold') {
-        await holdMutation.mutateAsync({ billId: id, data: { comment } });
+        await holdMutation.mutateAsync({ id: id as string, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else if (actionId === 'comment') {
-        await commentMutation.mutateAsync({ billId: id, data: { text: comment, authorId: 'md' } });
+        await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: 'session' } });
       }
       refetch();
     } catch (error) {

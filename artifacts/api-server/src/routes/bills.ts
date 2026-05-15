@@ -43,31 +43,29 @@ router.get("/bills", async (req, res): Promise<void> => {
 });
 
 router.post("/bills", async (req, res): Promise<void> => {
-  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority, createdBy, hasAttachment } = req.body;
-  if (!vendorId || !description || !amount || !scheduledDate || !createdBy) {
+  const actor = req.user!;
+  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority, hasAttachment } = req.body;
+  if (!vendorId || !description || !amount || !scheduledDate) {
     res.status(400).json({ error: "Missing required fields" }); return;
   }
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
-  const [creator] = await db.select().from(usersTable).where(eq(usersTable.id, createdBy));
   const vendorName = vendor?.name ?? "Unknown Vendor";
-  const createdByName = creator?.name ?? "Unknown User";
   const amountStr = String(amount);
 
   const [bill] = await db.insert(billsTable).values({
     id: uid(), vendorId, vendorName, description, amount: amountStr,
     paidAmount: "0", outstandingBalance: amountStr,
     scheduledDate, dueDate, walletId, priority: priority ?? "medium",
-    status: "pending", createdBy, createdByName,
+    status: "pending", createdBy: actor.id, createdByName: actor.name,
     hasAttachment: Boolean(hasAttachment), overdueDays: 0,
   }).returning();
 
-  // Update vendor outstanding balance
   await db.update(vendorsTable).set({
     outstandingBalance: sql`${vendorsTable.outstandingBalance} + ${amountStr}`,
     totalBilled: sql`${vendorsTable.totalBilled} + ${amountStr}`,
   }).where(eq(vendorsTable.id, vendorId));
 
-  await addAudit(bill!.id, createdBy, createdByName, "created", `Bill created for ${vendorName}`);
+  await addAudit(bill!.id, actor.id, actor.name, "created", `Bill created for ${vendorName}`);
   res.status(201).json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -110,30 +108,33 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/bills/:id/approve", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment, approvedAmount } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
   const [bill] = await db.update(billsTable).set({ status: "approved", approvedAmount: approvedAmount ? String(approvedAmount) : String(existing.amount) }).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, "md", "MD — Chief Executive", "approved", comment ?? "Bill approved");
-  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: "md", authorName: "MD — Chief Executive", authorRole: "md", text: comment });
+  await addAudit(rawId!, actor.id, actor.name, "approved", comment ?? "Bill approved");
+  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_approved", "Bill Approved", `Your bill for ${existing.vendorName} has been approved.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
 router.post("/bills/:id/reject", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
   const [bill] = await db.update(billsTable).set({ status: "rejected" }).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, "md", "MD — Chief Executive", "rejected", comment ?? "Bill rejected");
-  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: "md", authorName: "MD — Chief Executive", authorRole: "md", text: comment });
+  await addAudit(rawId!, actor.id, actor.name, "rejected", comment ?? "Bill rejected");
+  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_rejected", "Bill Rejected", `Your bill for ${existing.vendorName} has been rejected.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
 router.post("/bills/:id/hold", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment, rescheduleDate } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
@@ -141,13 +142,14 @@ router.post("/bills/:id/hold", async (req, res): Promise<void> => {
   const updates: Record<string, unknown> = { status: "on_hold" };
   if (rescheduleDate) updates["scheduledDate"] = rescheduleDate;
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, "md", "MD — Chief Executive", "held", comment ?? "Bill placed on hold");
-  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: "md", authorName: "MD — Chief Executive", authorRole: "md", text: comment });
+  await addAudit(rawId!, actor.id, actor.name, "held", comment ?? "Bill placed on hold");
+  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_held", "Bill On Hold", `Your bill for ${existing.vendorName} has been placed on hold.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
 router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { approvedAmount, comment } = req.body ?? {};
   if (!approvedAmount) { res.status(400).json({ error: "approvedAmount is required" }); return; }
@@ -155,20 +157,21 @@ router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
   const outstanding = parseFloat(String(existing.amount)) - approvedAmount;
   const [bill] = await db.update(billsTable).set({ status: "partial", approvedAmount: String(approvedAmount), outstandingBalance: String(outstanding) }).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, "md", "MD — Chief Executive", "partial_approved", comment ?? `Partial payment approved: ${approvedAmount}`, String(existing.amount), String(approvedAmount));
-  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: "md", authorName: "MD — Chief Executive", authorRole: "md", text: comment });
+  await addAudit(rawId!, actor.id, actor.name, "partial_approved", comment ?? `Partial payment approved: ${approvedAmount}`, String(existing.amount), String(approvedAmount));
+  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_partial", "Partial Approval", `Your bill for ${existing.vendorName} has been partially approved.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
 router.post("/bills/:id/escalate", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
   const [bill] = await db.update(billsTable).set({ priority: "urgent" }).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, "md", "MD — Chief Executive", "escalated", comment ?? "Bill escalated to urgent");
-  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: "md", authorName: "MD — Chief Executive", authorRole: "md", text: comment });
+  await addAudit(rawId!, actor.id, actor.name, "escalated", comment ?? "Bill escalated to urgent");
+  if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -179,21 +182,20 @@ router.get("/bills/:id/comments", async (req, res): Promise<void> => {
 });
 
 router.post("/bills/:id/comments", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
-  const { text, authorId } = req.body;
-  if (!text || !authorId) { res.status(400).json({ error: "text and authorId are required" }); return; }
-  const [author] = await db.select().from(usersTable).where(eq(usersTable.id, authorId));
+  const { text } = req.body;
+  if (!text) { res.status(400).json({ error: "text is required" }); return; }
   const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   const [comment] = await db.insert(commentsTable).values({
-    id: uid(), billId: rawId!, authorId,
-    authorName: author?.name ?? "Unknown",
-    authorRole: author?.role ?? "payment_assistant",
+    id: uid(), billId: rawId!, authorId: actor.id,
+    authorName: actor.name,
+    authorRole: actor.role,
     text,
   }).returning();
-  await addAudit(rawId!, authorId, author?.name ?? "Unknown", "commented", text);
-  // Notify bill creator if commenter is not the creator
-  if (bill && bill.createdBy !== authorId) {
-    await notify(bill.createdBy, "comment_added", "New Comment", `${author?.name ?? "Someone"} commented on your bill: "${text.slice(0, 60)}"`, rawId!);
+  await addAudit(rawId!, actor.id, actor.name, "commented", text);
+  if (bill && bill.createdBy !== actor.id) {
+    await notify(bill.createdBy, "comment_added", "New Comment", `${actor.name} commented on your bill: "${text.slice(0, 60)}"`, rawId!);
   }
   res.status(201).json(comment);
 });

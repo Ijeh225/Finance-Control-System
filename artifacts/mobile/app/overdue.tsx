@@ -21,7 +21,7 @@ export default function OverdueBillsScreen() {
 
   const handleEscalate = async (billId: string) => {
     try {
-      await escalateMutation.mutateAsync({ billId, data: { comment: 'Escalated from overdue list' } });
+      await escalateMutation.mutateAsync({ id: billId, data: { comment: 'Escalated from overdue list' } });
       refetch();
     } catch (error) {
       console.error(error);

@@ -7,6 +7,10 @@ import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
 import { DrizzleSessionStore } from "./lib/session-store";
 
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required");
+}
+
 const app: Express = express();
 
 app.use(
@@ -42,13 +46,13 @@ app.use(
   session({
     store: new DrizzleSessionStore(),
     name: "fincommand.sid",
-    secret: process.env.SESSION_SECRET ?? "dev-secret-change-in-production",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   }),

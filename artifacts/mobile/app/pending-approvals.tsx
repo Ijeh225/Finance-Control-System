@@ -37,16 +37,16 @@ export default function PendingApprovalsScreen() {
 
     try {
       if (actionId === 'approve') {
-        await approveMutation.mutateAsync({ billId: selectedBillId, data: { comment } });
+        await approveMutation.mutateAsync({ id: selectedBillId, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'partial' && amount) {
-        await partialMutation.mutateAsync({ billId: selectedBillId, data: { comment, approvedAmount: amount } });
+        await partialMutation.mutateAsync({ id: selectedBillId, data: { comment, approvedAmount: amount } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'reject') {
-        await rejectMutation.mutateAsync({ billId: selectedBillId, data: { comment } });
+        await rejectMutation.mutateAsync({ id: selectedBillId, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } else if (actionId === 'hold') {
-        await holdMutation.mutateAsync({ billId: selectedBillId, data: { comment } });
+        await holdMutation.mutateAsync({ id: selectedBillId, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
       refetch();
