@@ -61,11 +61,9 @@ export default function Wallets() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Wallets</h1>
           <p className="text-muted-foreground text-sm font-medium">Fund accounts and balance overview.</p>
         </div>
-        {isMd && (
-          <Button className="font-semibold shadow-sm" onClick={() => setShowCreate(true)} data-testid="button-create-wallet">
-            <Plus className="w-4 h-4 mr-2" /> Add Wallet
-          </Button>
-        )}
+        <Button className="font-semibold shadow-sm" onClick={() => setShowCreate(true)} data-testid="button-create-wallet">
+          <Plus className="w-4 h-4 mr-2" /> Add Wallet
+        </Button>
       </div>
 
       <Card className="shadow-sm border-primary/20 bg-primary/5">
@@ -97,11 +95,9 @@ export default function Wallets() {
                   <CardTitle className="text-base font-bold">{wallet.name}</CardTitle>
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">{wallet.accountNumber}</p>
                 </div>
-                {isMd && (
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setEditWallet({ id: wallet.id, name: wallet.name, balance: wallet.balance ?? 0 })} data-testid={`button-edit-wallet-${wallet.id}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
-                )}
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setEditWallet({ id: wallet.id, name: wallet.name, balance: wallet.balance ?? 0 })} data-testid={`button-edit-wallet-${wallet.id}`}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold font-mono">{formatCurrency(wallet.balance ?? 0, wallet.currency ?? "NGN")}</p>

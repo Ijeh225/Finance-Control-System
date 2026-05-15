@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, walletsTable, billsTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
@@ -7,6 +7,15 @@ const router: IRouter = Router();
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+}
+
+// Middleware: MD-only access
+function requireMd(req: Request, res: Response, next: NextFunction): void {
+  if (req.user?.role !== "md") {
+    res.status(403).json({ error: "MD role required" });
+    return;
+  }
+  next();
 }
 
 const safeUserColumns = {
@@ -19,20 +28,34 @@ const safeUserColumns = {
   createdAt: usersTable.createdAt,
 } as const;
 
-router.get("/users", async (_req, res): Promise<void> => {
+// GET /users — MD-only: see all users
+router.get("/users", requireMd, async (_req, res): Promise<void> => {
   const users = await db.select(safeUserColumns).from(usersTable).orderBy(usersTable.createdAt);
   res.json({ users });
 });
 
+// GET /users/:id — MD or self
 router.get("/users/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const id = req.params["id"] as string;
+  if (actor.role !== "md" && actor.id !== id) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
   const [user] = await db.select(safeUserColumns).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
   res.json(user);
 });
 
+// GET /users/:id/profile — MD or self
 router.get("/users/:id/profile", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const id = req.params["id"] as string;
+
+  if (actor.role !== "md" && actor.id !== id) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
 
   const [user] = await db.select(safeUserColumns).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -67,7 +90,8 @@ router.get("/users/:id/profile", async (req, res): Promise<void> => {
   res.json({ ...user, wallets: fmtWallets, billStats, recentBills });
 });
 
-router.post("/users", async (req, res): Promise<void> => {
+// POST /users — MD-only: create new users
+router.post("/users", requireMd, async (req, res): Promise<void> => {
   const { name, role, email, phone, password } = req.body;
   if (!name || !role) { res.status(400).json({ error: "name and role are required" }); return; }
   if (!password) { res.status(400).json({ error: "password is required" }); return; }
@@ -85,7 +109,8 @@ router.post("/users", async (req, res): Promise<void> => {
   res.status(201).json(inserted);
 });
 
-router.patch("/users/:id", async (req, res): Promise<void> => {
+// PATCH /users/:id — MD-only: edit any user
+router.patch("/users/:id", requireMd, async (req, res): Promise<void> => {
   const id = req.params["id"] as string;
   const { name, role, email, phone, isActive, password } = req.body;
 
@@ -107,8 +132,16 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
   res.json(updated);
 });
 
-router.delete("/users/:id", async (req, res): Promise<void> => {
+// DELETE /users/:id — MD-only: soft deactivate
+router.delete("/users/:id", requireMd, async (req, res): Promise<void> => {
+  const actor = req.user!;
   const id = req.params["id"] as string;
+
+  if (actor.id === id) {
+    res.status(400).json({ error: "Cannot deactivate your own account" });
+    return;
+  }
+
   const [updated] = await db
     .update(usersTable)
     .set({ isActive: false })

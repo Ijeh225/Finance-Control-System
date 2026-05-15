@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -22,6 +22,8 @@ export async function seedIfEmpty() {
     if (existing.length > 0) {
       // Ensure all existing users have a passwordHash (e.g. after schema migration)
       await ensurePasswords();
+      // Backfill wallet ownership for existing installs where ownedBy was not set
+      await ensureWalletOwnership();
       return;
     }
 
@@ -58,9 +60,9 @@ export async function seedIfEmpty() {
 
     const w1Id = uid(); const w2Id = uid(); const w3Id = uid();
     await db.insert(walletsTable).values([
-      { id: w1Id, name: "Zenith Bank Main", bankName: "Zenith Bank", accountNumber: "1234567890", balance: "5420000", currency: "NGN", isLow: false },
-      { id: w2Id, name: "GTB Operations", bankName: "GTB", accountNumber: "0987654321", balance: "820000", currency: "NGN", isLow: false },
-      { id: w3Id, name: "First Bank Petty Cash", bankName: "First Bank", accountNumber: "3012345678", balance: "45000", currency: "NGN", isLow: true },
+      { id: w1Id, name: "Zenith Bank Main", bankName: "Zenith Bank", accountNumber: "1234567890", balance: "5420000", currency: "NGN", isLow: false, ownedBy: mrAId },
+      { id: w2Id, name: "GTB Operations", bankName: "GTB", accountNumber: "0987654321", balance: "820000", currency: "NGN", isLow: false, ownedBy: mrBId },
+      { id: w3Id, name: "First Bank Petty Cash", bankName: "First Bank", accountNumber: "3012345678", balance: "45000", currency: "NGN", isLow: true, ownedBy: mrCId },
     ]);
 
     const today = new Date().toISOString().split("T")[0]!;
@@ -108,6 +110,50 @@ export async function seedIfEmpty() {
     logger.info("Seeding complete.");
   } catch (err) {
     logger.error({ err }, "Seeding failed");
+  }
+}
+
+/**
+ * Backfill wallet ownership for existing installs where ownedBy was not previously set.
+ * Assigns each unowned wallet to the user who created the most bills using that wallet.
+ * Falls back to the first non-MD user if no bills reference the wallet.
+ */
+async function ensureWalletOwnership() {
+  const unowned = await db.select({ id: walletsTable.id }).from(walletsTable)
+    .where(isNull(walletsTable.ownedBy));
+  if (unowned.length === 0) return;
+
+  // Find non-MD users (payment_assistants / treasury) to assign ownership
+  const staffUsers = await db.select({ id: usersTable.id, role: usersTable.role })
+    .from(usersTable)
+    .where(eq(usersTable.isActive, true));
+  const nonMdUsers = staffUsers.filter(u => u.role !== "md");
+  if (nonMdUsers.length === 0) return;
+
+  // Get all bills with walletId set to determine top creator per wallet
+  const bills = await db.select({ walletId: billsTable.walletId, createdBy: billsTable.createdBy })
+    .from(billsTable);
+
+  for (const wallet of unowned) {
+    // Count bills per creator for this wallet
+    const counts = new Map<string, number>();
+    for (const b of bills) {
+      if (b.walletId === wallet.id && b.createdBy) {
+        counts.set(b.createdBy, (counts.get(b.createdBy) ?? 0) + 1);
+      }
+    }
+
+    let assignTo: string;
+    if (counts.size > 0) {
+      // Assign to whoever created the most bills for this wallet
+      assignTo = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+    } else {
+      // Fall back to first non-MD user
+      assignTo = nonMdUsers[0]!.id;
+    }
+
+    await db.update(walletsTable).set({ ownedBy: assignTo }).where(eq(walletsTable.id, wallet.id));
+    logger.info({ walletId: wallet.id, assignedTo: assignTo }, "Backfilled wallet ownership");
   }
 }
 

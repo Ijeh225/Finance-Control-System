@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, walletsTable, billsTable, usersTable } from "@workspace/db";
-import type { Request } from "express";
 
 const router: IRouter = Router();
 
@@ -9,80 +8,80 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
-function fmt(w: Record<string, unknown>, ownerName?: string) {
+function fmtWallet(w: typeof walletsTable.$inferSelect, ownerName?: string) {
   return {
     ...w,
-    balance: parseFloat(String(w["balance"] ?? 0)),
-    ownedByName: ownerName ?? undefined,
+    balance: parseFloat(String(w.balance ?? 0)),
+    ownedByName: ownerName,
   };
 }
 
-router.get("/wallets", async (req: Request, res): Promise<void> => {
-  const user = (req as any).user as { id: string; role: string } | undefined;
+router.get("/wallets", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const requestedUserId = req.query["userId"] as string | undefined;
 
-  let ownedBy: string | undefined;
-  if (user?.role !== "md") {
-    ownedBy = user?.id;
-  } else if (requestedUserId) {
-    ownedBy = requestedUserId;
-  }
+  // Non-MD users: scoped to their own wallets only (ignore userId param)
+  // MD: optionally filter by userId, or see all
+  const ownedBy = actor.role !== "md"
+    ? actor.id
+    : requestedUserId ?? undefined;
 
   const wallets = ownedBy
     ? await db.select().from(walletsTable).where(eq(walletsTable.ownedBy, ownedBy))
     : await db.select().from(walletsTable);
 
-  // Attach owner names
+  // Attach owner names in bulk
   const ownerIds = [...new Set(wallets.map(w => w.ownedBy).filter(Boolean))] as string[];
   const owners = ownerIds.length
     ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable)
     : [];
-  const ownerMap = Object.fromEntries(owners.map(o => [o.id, o.name]));
+  const ownerMap: Record<string, string> = Object.fromEntries(owners.map(o => [o.id, o.name]));
 
-  res.json({ wallets: wallets.map(w => fmt(w as Record<string, unknown>, w.ownedBy ? ownerMap[w.ownedBy] : undefined)) });
+  res.json({ wallets: wallets.map(w => fmtWallet(w, w.ownedBy ? ownerMap[w.ownedBy] : undefined)) });
 });
 
-router.post("/wallets", async (req: Request, res): Promise<void> => {
-  const user = (req as any).user as { id: string; role: string } | undefined;
+router.post("/wallets", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const { name, bankName, accountNumber, balance, currency, ownedBy: bodyOwnedBy } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
-  // Wallet owner: if MD specifies ownedBy use that, otherwise use the requesting user
-  const ownedBy = user?.role === "md" && bodyOwnedBy ? bodyOwnedBy : (user?.id ?? null);
+  // MD can assign to any user; everyone else always owns the wallet themselves
+  const ownedBy = actor.role === "md" && bodyOwnedBy ? bodyOwnedBy : actor.id;
 
   const [wallet] = await db.insert(walletsTable).values({
-    id: uid(), name, bankName, accountNumber,
+    id: uid(),
+    name,
+    bankName: bankName ?? null,
+    accountNumber: accountNumber ?? null,
     balance: String(balance ?? 0),
     currency: currency ?? "NGN",
     ownedBy,
   }).returning();
 
-  // Get owner name
   let ownerName: string | undefined;
   if (wallet.ownedBy) {
     const [owner] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, wallet.ownedBy));
     ownerName = owner?.name;
   }
 
-  res.status(201).json(fmt(wallet as Record<string, unknown>, ownerName));
+  res.status(201).json(fmtWallet(wallet, ownerName));
 });
 
-router.get("/wallets/:id", async (req: Request, res): Promise<void> => {
-  const user = (req as any).user as { id: string; role: string } | undefined;
+router.get("/wallets/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const id = req.params["id"] as string;
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
 
   // Non-MD can only access their own wallet
-  if (user?.role !== "md" && wallet.ownedBy && wallet.ownedBy !== user?.id) {
+  if (actor.role !== "md" && wallet.ownedBy && wallet.ownedBy !== actor.id) {
     res.status(403).json({ error: "Access denied" });
     return;
   }
 
-  const whereClause = and(eq(billsTable.walletId, id));
   const recentTransactions = await db.select().from(billsTable)
-    .where(whereClause)
+    .where(eq(billsTable.walletId, id))
     .limit(20);
 
   let ownerName: string | undefined;
@@ -92,25 +91,28 @@ router.get("/wallets/:id", async (req: Request, res): Promise<void> => {
   }
 
   res.json({
-    ...fmt(wallet as Record<string, unknown>, ownerName),
+    ...fmtWallet(wallet, ownerName),
     recentTransactions: recentTransactions.map(b => ({
       ...b,
       amount: parseFloat(String(b.amount)),
       paidAmount: parseFloat(String(b.paidAmount ?? 0)),
       outstandingBalance: parseFloat(String(b.outstandingBalance ?? 0)),
-    }))
+    })),
   });
 });
 
-router.patch("/wallets/:id", async (req: Request, res): Promise<void> => {
-  const user = (req as any).user as { id: string; role: string } | undefined;
+router.patch("/wallets/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const id = req.params["id"] as string;
   const { balance, name, bankName, accountNumber, currency, ownedBy } = req.body;
 
   const [existing] = await db.select({ ownedBy: walletsTable.ownedBy }).from(walletsTable).where(eq(walletsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Wallet not found" }); return; }
-  if (user?.role !== "md" && existing.ownedBy !== user?.id) {
-    res.status(403).json({ error: "Access denied" }); return;
+
+  // Non-MD can only update their own wallet
+  if (actor.role !== "md" && existing.ownedBy !== actor.id) {
+    res.status(403).json({ error: "Access denied" });
+    return;
   }
 
   const updates: Record<string, unknown> = {};
@@ -119,7 +121,13 @@ router.patch("/wallets/:id", async (req: Request, res): Promise<void> => {
   if (bankName !== undefined) updates["bankName"] = bankName;
   if (accountNumber !== undefined) updates["accountNumber"] = accountNumber;
   if (currency !== undefined) updates["currency"] = currency;
-  if (ownedBy !== undefined && user?.role === "md") updates["ownedBy"] = ownedBy;
+  // Only MD can reassign wallet ownership
+  if (ownedBy !== undefined && actor.role === "md") updates["ownedBy"] = ownedBy;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
+  }
 
   const [wallet] = await db.update(walletsTable).set(updates).where(eq(walletsTable.id, id)).returning();
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
@@ -130,7 +138,7 @@ router.patch("/wallets/:id", async (req: Request, res): Promise<void> => {
     ownerName = owner?.name;
   }
 
-  res.json(fmt(wallet as Record<string, unknown>, ownerName));
+  res.json(fmtWallet(wallet, ownerName));
 });
 
 export default router;
