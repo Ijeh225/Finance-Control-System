@@ -67,7 +67,7 @@ export default function WalletDetail() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetWalletQueryKey(id!) });
-        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(id!, { page, pageSize }) });
+        qc.invalidateQueries({ queryKey: [`/api/wallets/${id}/statement`] });
         qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
         setShowTransfer(false);
         setTransferForm({ fromWalletId: id ?? "", toWalletId: "", amount: "", narration: "" });

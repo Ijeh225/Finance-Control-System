@@ -65,8 +65,8 @@ export default function Wallets() {
         qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
         qc.invalidateQueries({ queryKey: getGetWalletQueryKey(data.from.id) });
         qc.invalidateQueries({ queryKey: getGetWalletQueryKey(data.to.id) });
-        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(data.from.id, {}) });
-        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(data.to.id, {}) });
+        qc.invalidateQueries({ queryKey: [`/api/wallets/${data.from.id}/statement`] });
+        qc.invalidateQueries({ queryKey: [`/api/wallets/${data.to.id}/statement`] });
         setShowTransfer(false);
         setTransferForm({ fromWalletId: "", toWalletId: "", amount: "", narration: "" });
         toast({ title: "Transfer completed successfully" });
