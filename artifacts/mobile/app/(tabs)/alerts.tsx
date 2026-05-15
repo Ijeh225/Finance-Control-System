@@ -57,15 +57,13 @@ export default function AlertsScreen() {
   };
 
   const handleNotificationPress = (notification: { id: string; isRead: boolean; billId?: string | null }) => {
-    if (!notification.isRead) {
-      markRead(
-        { id: notification.id },
-        { onSuccess: invalidateAndRefetch }
-      );
-    }
     if (notification.billId) {
       router.push(`/bill/${notification.billId}`);
     }
+  };
+
+  const handleMarkOneRead = (id: string) => {
+    markRead({ id }, { onSuccess: invalidateAndRefetch });
   };
 
   return (
@@ -117,7 +115,13 @@ export default function AlertsScreen() {
                     {item.title}
                   </Text>
                   {!item.isRead && (
-                    <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
+                    <Pressable
+                      onPress={(e) => { e.stopPropagation(); handleMarkOneRead(item.id); }}
+                      style={[styles.markReadBtn, { backgroundColor: colors.primary + '18' }]}
+                      hitSlop={8}
+                    >
+                      <Feather name="check" size={14} color={colors.primary} />
+                    </Pressable>
                   )}
                 </View>
                 <Text style={[styles.alertBody, { color: colors.secondaryForeground }]}>{item.body}</Text>
@@ -196,10 +200,12 @@ const styles = StyleSheet.create({
   alertTitleUnread: {
     fontWeight: '800',
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  markReadBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 8,
     flexShrink: 0,
   },
