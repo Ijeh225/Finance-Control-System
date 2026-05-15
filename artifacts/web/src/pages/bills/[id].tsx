@@ -140,6 +140,26 @@ export default function BillDetail() {
 
   const handleFileUpload = async (file: File) => {
     if (!id) return;
+
+    const ALLOWED_TYPES = new Set([
+      "application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/csv", "application/octet-stream",
+    ]);
+    if (file.type && !ALLOWED_TYPES.has(file.type)) {
+      toast({ title: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: "File exceeds the 20 MB limit.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setIsUploading(true);
     try {
       const uploadData = await requestUpload.mutateAsync({
@@ -147,11 +167,14 @@ export default function BillDetail() {
         data: { fileName: file.name, fileSize: file.size, mimeType: file.type || "application/octet-stream" },
       });
 
-      await fetch(uploadData.uploadUrl, {
+      const putRes = await fetch(uploadData.uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
       });
+      if (!putRes.ok) {
+        throw new Error(`Storage upload failed: ${putRes.status}`);
+      }
 
       await confirmUpload.mutateAsync({ id, attachmentId: uploadData.attachmentId });
       qc.invalidateQueries({ queryKey: getListBillAttachmentsQueryKey(id) });
@@ -333,6 +356,7 @@ export default function BillDetail() {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.csv"
                 data-testid="input-attachment-file"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

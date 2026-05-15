@@ -7,6 +7,22 @@ import { Readable } from "stream";
 const router: IRouter = Router();
 const storageService = new ObjectStorageService();
 
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "application/octet-stream",
+]);
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
@@ -27,6 +43,16 @@ router.post("/bills/:id/attachments/request-upload", async (req, res): Promise<v
 
   if (!fileName) {
     res.status(400).json({ error: "fileName is required" });
+    return;
+  }
+
+  if (mimeType && !ALLOWED_MIME_TYPES.has(mimeType)) {
+    res.status(400).json({ error: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV." });
+    return;
+  }
+
+  if (fileSize && fileSize > MAX_FILE_SIZE) {
+    res.status(400).json({ error: "File size exceeds the 20 MB limit." });
     return;
   }
 

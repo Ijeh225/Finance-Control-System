@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -6,20 +6,29 @@ import {
   useCreateBill,
   useListVendors, getListVendorsQueryKey,
   useListWallets, getListWalletsQueryKey,
+  useRequestBillAttachmentUpload,
+  useConfirmBillAttachment,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileText, ChevronRight } from "lucide-react";
+import { Search, Plus, FileText, ChevronRight, Paperclip, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const ALLOWED_ATTACH_TYPES = new Set([
+  "application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv", "application/octet-stream",
+]);
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
@@ -50,6 +59,9 @@ export default function BillsList() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [priorityFilter, setPriorityFilter] = useState<string>("");
   const [showCreate, setShowCreate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const attachFileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     vendorId: "",
     description: "",
@@ -79,17 +91,66 @@ export default function BillsList() {
     query: { queryKey: getListWalletsQueryKey() },
   });
 
-  const createBill = useCreateBill({
-    mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListBillsQueryKey() });
-        setShowCreate(false);
-        setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "", priority: "medium", notes: "" });
+  const createBill = useCreateBill();
+  const requestUpload = useRequestBillAttachmentUpload();
+  const confirmUpload = useConfirmBillAttachment();
+
+  const resetCreateDialog = () => {
+    setShowCreate(false);
+    setIsSubmitting(false);
+    setPendingFile(null);
+    setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "", priority: "medium", notes: "" });
+    if (attachFileRef.current) attachFileRef.current.value = "";
+  };
+
+  const handleSubmitBill = async () => {
+    setIsSubmitting(true);
+    try {
+      const created = await createBill.mutateAsync({
+        data: {
+          vendorId: form.vendorId,
+          description: form.description,
+          amount: Number(form.amount),
+          scheduledDate: form.scheduledDate,
+          dueDate: form.dueDate || undefined,
+          walletId: form.walletId || undefined,
+          priority: form.priority,
+          createdBy: user!.id,
+        },
+      });
+      qc.invalidateQueries({ queryKey: getListBillsQueryKey() });
+
+      if (pendingFile && created?.id) {
+        try {
+          const uploadData = await requestUpload.mutateAsync({
+            id: created.id,
+            data: {
+              fileName: pendingFile.name,
+              fileSize: pendingFile.size,
+              mimeType: pendingFile.type || "application/octet-stream",
+            },
+          });
+          const putRes = await fetch(uploadData.uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": pendingFile.type || "application/octet-stream" },
+            body: pendingFile,
+          });
+          if (!putRes.ok) throw new Error(`Storage upload failed: ${putRes.status}`);
+          await confirmUpload.mutateAsync({ id: created.id, attachmentId: uploadData.attachmentId });
+          toast({ title: "Bill submitted with attachment" });
+        } catch {
+          toast({ title: "Bill submitted but attachment upload failed", variant: "destructive" });
+        }
+      } else {
         toast({ title: "Bill submitted for approval" });
-      },
-      onError: () => toast({ title: "Failed to create bill", variant: "destructive" }),
-    },
-  });
+      }
+
+      resetCreateDialog();
+    } catch {
+      toast({ title: "Failed to create bill", variant: "destructive" });
+      setIsSubmitting(false);
+    }
+  };
 
   const filteredBills = data?.bills?.filter(b =>
     !search || b.vendorName?.toLowerCase().includes(search.toLowerCase()) || b.description?.toLowerCase().includes(search.toLowerCase())
@@ -267,25 +328,66 @@ export default function BillsList() {
               </div>
             ) : null}
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button
-              disabled={!form.vendorId || !form.description || !form.amount || !form.scheduledDate || createBill.isPending}
-              onClick={() => createBill.mutate({
-                data: {
-                  vendorId: form.vendorId,
-                  description: form.description,
-                  amount: Number(form.amount),
-                  scheduledDate: form.scheduledDate,
-                  dueDate: form.dueDate || undefined,
-                  walletId: form.walletId || undefined,
-                  priority: form.priority,
-                  createdBy: user!.id,
+          {/* Optional attachment */}
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Attach Document (optional)</Label>
+            <input
+              ref={attachFileRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.csv"
+              data-testid="input-create-bill-attachment"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (!file) { setPendingFile(null); return; }
+                if (file.type && !ALLOWED_ATTACH_TYPES.has(file.type)) {
+                  toast({ title: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV.", variant: "destructive" });
+                  if (attachFileRef.current) attachFileRef.current.value = "";
+                  return;
                 }
-              })}
+                if (file.size > 20 * 1024 * 1024) {
+                  toast({ title: "File exceeds the 20 MB limit.", variant: "destructive" });
+                  if (attachFileRef.current) attachFileRef.current.value = "";
+                  return;
+                }
+                setPendingFile(file);
+              }}
+            />
+            {pendingFile ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded border text-sm">
+                <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => { setPendingFile(null); if (attachFileRef.current) attachFileRef.current.value = ""; }}
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                  data-testid="button-remove-attachment"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full text-muted-foreground"
+                onClick={() => attachFileRef.current?.click()}
+                data-testid="button-pick-attachment"
+              >
+                <Paperclip className="w-3.5 h-3.5 mr-1.5" /> Choose file…
+              </Button>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={resetCreateDialog}>Cancel</Button>
+            <Button
+              disabled={!form.vendorId || !form.description || !form.amount || !form.scheduledDate || isSubmitting}
+              onClick={() => void handleSubmitBill()}
               data-testid="button-confirm-create-bill"
             >
-              {createBill.isPending ? "Submitting..." : "Submit Bill"}
+              {isSubmitting ? "Submitting..." : "Submit Bill"}
             </Button>
           </div>
         </DialogContent>

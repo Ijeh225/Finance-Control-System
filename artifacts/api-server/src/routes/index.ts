@@ -19,7 +19,6 @@ const router: IRouter = Router();
 // Public routes — no auth required
 router.use(healthRouter);
 router.use(authRouter);
-router.use(storageRouter);
 
 // All routes below require a valid session
 router.use(requireAuth);
@@ -31,6 +30,7 @@ router.use(walletsRouter);
 router.use(notificationsRouter);
 router.use(auditRouter);
 router.use(reportsRouter);
+router.use(storageRouter);
 router.use(attachmentsRouter);
 router.use(exportsRouter);
 
