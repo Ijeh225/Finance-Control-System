@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Pressable, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useLocalSearchParams } from 'expo-router';
-import { useGetBill, getGetBillQueryKey, useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useAddBillComment } from '@workspace/api-client-react';
+import { useGetBill, getGetBillQueryKey, useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useAddBillComment, useEscalateBill } from '@workspace/api-client-react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText } from '@/components/finance/AmountText';
 import { StatusBadge } from '@/components/finance/StatusBadge';
