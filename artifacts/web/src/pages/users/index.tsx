@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, ChevronRight, UserX, Pencil, ShieldAlert, User as UserIcon } from "lucide-react";
-import type { User } from "@workspace/api-client-react";
+import type { User, CreateUserInputRole, UpdateUserInput } from "@workspace/api-client-react";
 
 const ROLE_LABELS: Record<string, string> = {
   md: "MD — Chief Executive",
@@ -67,10 +67,10 @@ export default function UsersList() {
         setForm(emptyForm());
         toast({ title: "User created" });
       },
-      onError: (e: any) => toast({
-        title: e?.response?.data?.error ?? "Failed to create user",
-        variant: "destructive",
-      }),
+      onError: (err: unknown) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: msg ?? "Failed to create user", variant: "destructive" });
+      },
     },
   });
 
@@ -110,17 +110,17 @@ export default function UsersList() {
   };
 
   const handleCreate = () => {
-    createUser.mutate({ data: { name: form.name, role: form.role as any, email: form.email || undefined, phone: form.phone || undefined, password: form.password } });
+    createUser.mutate({ data: { name: form.name, role: form.role as CreateUserInputRole, email: form.email || undefined, phone: form.phone || undefined, password: form.password } });
   };
 
   const handleUpdate = () => {
     if (!editTarget) return;
-    const payload: Record<string, any> = {};
-    if (editForm.name) payload["name"] = editForm.name;
-    if (editForm.role) payload["role"] = editForm.role;
-    if (editForm.email !== undefined) payload["email"] = editForm.email;
-    if (editForm.phone !== undefined) payload["phone"] = editForm.phone;
-    if (editForm.password) payload["password"] = editForm.password;
+    const payload: UpdateUserInput = {};
+    if (editForm.name) payload.name = editForm.name;
+    if (editForm.role) payload.role = editForm.role as UpdateUserInput["role"];
+    if (editForm.email !== undefined) payload.email = editForm.email;
+    if (editForm.phone !== undefined) payload.phone = editForm.phone;
+    if (editForm.password) payload.password = editForm.password;
     updateUser.mutate({ id: editTarget.id, data: payload });
   };
 
@@ -166,6 +166,13 @@ export default function UsersList() {
                   {!u.isActive && <span className="text-xs text-destructive font-medium">(Deactivated)</span>}
                 </div>
                 <p className="text-sm text-muted-foreground truncate">{u.email ?? "—"}</p>
+                {u.billStats && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                    {u.billStats.total} bill{u.billStats.total !== 1 ? "s" : ""}
+                    {u.billStats.pending > 0 && <span className="text-amber-600"> · {u.billStats.pending} pending</span>}
+                    {" · "}₦{(u.billStats.totalAmount ?? 0).toLocaleString("en-NG", { maximumFractionDigits: 0 })} total
+                  </p>
+                )}
               </div>
               <Badge className={`text-xs font-medium border ${ROLE_COLORS[u.role] ?? ""}`} variant="outline">
                 {ROLE_LABELS[u.role] ?? u.role}

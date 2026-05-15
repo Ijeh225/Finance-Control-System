@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, numeric, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { usersTable } from "./users";
 
 export const walletsTable = pgTable("wallets", {
   id: text("id").primaryKey(),
@@ -10,7 +11,7 @@ export const walletsTable = pgTable("wallets", {
   balance: numeric("balance", { precision: 15, scale: 2 }).notNull().default("0"),
   currency: text("currency").notNull().default("NGN"),
   isLow: boolean("is_low").notNull().default(false),
-  ownedBy: text("owned_by"),
+  ownedBy: text("owned_by").references(() => usersTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

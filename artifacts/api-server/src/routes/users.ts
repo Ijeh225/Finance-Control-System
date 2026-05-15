@@ -28,10 +28,37 @@ const safeUserColumns = {
   createdAt: usersTable.createdAt,
 } as const;
 
-// GET /users — MD-only: see all users
+// GET /users — MD-only: all users with per-user bill stats
 router.get("/users", requireMd, async (_req, res): Promise<void> => {
   const users = await db.select(safeUserColumns).from(usersTable).orderBy(usersTable.createdAt);
-  res.json({ users });
+
+  const bills = await db
+    .select({
+      createdBy: billsTable.createdBy,
+      status: billsTable.status,
+      amount: billsTable.amount,
+      paidAmount: billsTable.paidAmount,
+      outstandingBalance: billsTable.outstandingBalance,
+    })
+    .from(billsTable);
+
+  type Stats = { total: number; pending: number; approved: number; totalAmount: number; paidAmount: number; outstandingAmount: number };
+  const statsMap = new Map<string, Stats>();
+  for (const bill of bills) {
+    const s = statsMap.get(bill.createdBy) ?? { total: 0, pending: 0, approved: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 };
+    s.total++;
+    if (bill.status === "pending") s.pending++;
+    if (bill.status === "approved") s.approved++;
+    s.totalAmount += parseFloat(String(bill.amount ?? 0));
+    s.paidAmount += parseFloat(String(bill.paidAmount ?? 0));
+    s.outstandingAmount += parseFloat(String(bill.outstandingBalance ?? 0));
+    statsMap.set(bill.createdBy, s);
+  }
+
+  const empty: Stats = { total: 0, pending: 0, approved: 0, totalAmount: 0, paidAmount: 0, outstandingAmount: 0 };
+  const withStats = users.map(u => ({ ...u, billStats: statsMap.get(u.id) ?? empty }));
+
+  res.json({ users: withStats });
 });
 
 // GET /users/:id — MD or self

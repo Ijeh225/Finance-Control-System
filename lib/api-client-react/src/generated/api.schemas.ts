@@ -18,6 +18,15 @@ export const UserRole = {
   payment_assistant: 'payment_assistant',
 } as const;
 
+export type UserBillStats = {
+  total: number;
+  pending: number;
+  approved: number;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+};
+
 export interface User {
   id: string;
   name: string;
@@ -26,6 +35,7 @@ export interface User {
   phone?: string;
   isActive: boolean;
   createdAt: string;
+  billStats?: UserBillStats;
 }
 
 export type CreateUserInputRole = typeof CreateUserInputRole[keyof typeof CreateUserInputRole];

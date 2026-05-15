@@ -185,7 +185,7 @@ export default function BillsList() {
                         <div className="flex items-center gap-3 mt-1 text-xs font-mono text-muted-foreground">
                           <span>Due: {formatDate(bill.dueDate)}</span>
                           <span>·</span>
-                          <span>{bill.createdByName}</span>
+                          <Link href={`/users/${bill.createdBy}`} className="hover:underline hover:text-foreground transition-colors">{bill.createdByName}</Link>
                         </div>
                       </div>
                     </div>

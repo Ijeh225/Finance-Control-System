@@ -6,6 +6,7 @@ import {
   useListWallets, getListWalletsQueryKey,
   useCreateWallet,
 } from "@workspace/api-client-react";
+import type { UpdateUserInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
@@ -16,10 +17,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ShieldAlert, User as UserIcon, Wallet, Receipt,
-  CheckCircle, Clock, AlertTriangle, Plus,
+  CheckCircle, Clock, AlertTriangle, Plus, Pencil,
 } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -45,6 +49,8 @@ export default function UserProfile() {
   const { toast } = useToast();
   const [showAddWallet, setShowAddWallet] = useState(false);
   const [walletForm, setWalletForm] = useState({ name: "", bankName: "", accountNumber: "", balance: "", currency: "NGN" });
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", role: "", email: "", phone: "", password: "" });
 
   const { data: profile, isLoading } = useGetUserProfile(id!);
   const { data: walletsData } = useListWallets(id ? { userId: id } : undefined);
@@ -70,6 +76,33 @@ export default function UserProfile() {
       },
     },
   });
+
+  const editUser = useUpdateUser({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetUserProfileQueryKey(id!) });
+        setShowEdit(false);
+        toast({ title: "User updated" });
+      },
+      onError: () => toast({ title: "Failed to update user", variant: "destructive" }),
+    },
+  });
+
+  const openEdit = () => {
+    if (!profile) return;
+    setEditForm({ name: profile.name, role: profile.role, email: profile.email ?? "", phone: profile.phone ?? "", password: "" });
+    setShowEdit(true);
+  };
+
+  const handleEdit = () => {
+    const payload: UpdateUserInput = {};
+    if (editForm.name) payload.name = editForm.name;
+    if (editForm.role) payload.role = editForm.role as UpdateUserInput["role"];
+    if (editForm.email !== undefined) payload.email = editForm.email;
+    if (editForm.phone !== undefined) payload.phone = editForm.phone;
+    if (editForm.password) payload.password = editForm.password;
+    editUser.mutate({ id: id!, data: payload });
+  };
 
   const handleCreateWallet = () => {
     createWallet.mutate({
@@ -135,14 +168,21 @@ export default function UserProfile() {
                 <span>🗓 Joined {new Date(profile.createdAt).toLocaleDateString("en-NG", { month: "long", year: "numeric" })}</span>
               </div>
             </div>
-            {isMd && profile.id !== currentUser?.id && (
-              <Button
-                variant={profile.isActive ? "outline" : "default"}
-                className={profile.isActive ? "border-destructive text-destructive hover:bg-destructive/10" : ""}
-                onClick={() => toggleActive.mutate({ id: profile.id, data: { isActive: !profile.isActive } })}
-              >
-                {profile.isActive ? "Deactivate User" : "Reactivate User"}
-              </Button>
+            {isMd && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={openEdit}>
+                  <Pencil className="w-4 h-4 mr-2" /> Edit User
+                </Button>
+                {profile.id !== currentUser?.id && (
+                  <Button
+                    variant={profile.isActive ? "outline" : "default"}
+                    className={profile.isActive ? "border-destructive text-destructive hover:bg-destructive/10" : ""}
+                    onClick={() => toggleActive.mutate({ id: profile.id, data: { isActive: !profile.isActive } })}
+                  >
+                    {profile.isActive ? "Deactivate User" : "Reactivate User"}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </CardContent>
@@ -310,6 +350,50 @@ export default function UserProfile() {
             <Button variant="outline" onClick={() => setShowAddWallet(false)}>Cancel</Button>
             <Button onClick={handleCreateWallet} disabled={!walletForm.name || createWallet.isPending}>
               {createWallet.isPending ? "Creating…" : "Create Wallet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEdit} onOpenChange={open => !open && setShowEdit(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User — {profile?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Full Name</Label>
+              <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Role</Label>
+              <Select value={editForm.role} onValueChange={v => setEditForm(f => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="payment_assistant">Payment Assistant</SelectItem>
+                  <SelectItem value="treasury">Treasury</SelectItem>
+                  <SelectItem value="md">MD — Chief Executive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New Password <span className="text-muted-foreground text-xs">(leave blank to keep current)</span></Label>
+              <Input type="password" placeholder="••••••••" value={editForm.password} onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEdit(false)}>Cancel</Button>
+            <Button onClick={handleEdit} disabled={editUser.isPending}>
+              {editUser.isPending ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

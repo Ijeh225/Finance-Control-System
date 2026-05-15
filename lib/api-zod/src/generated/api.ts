@@ -203,7 +203,15 @@ export const ListUsersResponse = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "isActive": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "billStats": zod.object({
+  "total": zod.number(),
+  "pending": zod.number(),
+  "approved": zod.number(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "outstandingAmount": zod.number()
+}).optional()
 }))
 })
 
@@ -234,7 +242,15 @@ export const GetUserResponse = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "isActive": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "billStats": zod.object({
+  "total": zod.number(),
+  "pending": zod.number(),
+  "approved": zod.number(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "outstandingAmount": zod.number()
+}).optional()
 })
 
 
@@ -261,7 +277,15 @@ export const UpdateUserResponse = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "isActive": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "billStats": zod.object({
+  "total": zod.number(),
+  "pending": zod.number(),
+  "approved": zod.number(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "outstandingAmount": zod.number()
+}).optional()
 })
 
 
@@ -291,7 +315,15 @@ export const GetUserProfileResponse = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "isActive": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "billStats": zod.object({
+  "total": zod.number(),
+  "pending": zod.number(),
+  "approved": zod.number(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "outstandingAmount": zod.number()
+}).optional()
 }).and(zod.object({
   "wallets": zod.array(zod.object({
   "id": zod.string(),
