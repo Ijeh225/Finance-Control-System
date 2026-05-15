@@ -41,6 +41,7 @@ router.get("/wallets", async (req, res): Promise<void> => {
   const ownerIds = [...new Set(wallets.map(w => w.ownedBy).filter(Boolean))] as string[];
   const owners = ownerIds.length
     ? await db.select({ id: usersTable.id, name: usersTable.name }).from(usersTable)
+        .where(sql`${usersTable.id} = ANY(ARRAY[${sql.join(ownerIds.map(id => sql`${id}`), sql`, `)}]::text[])`)
     : [];
   const ownerMap: Record<string, string> = Object.fromEntries(owners.map(o => [o.id, o.name]));
 
