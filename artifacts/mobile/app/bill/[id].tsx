@@ -26,7 +26,8 @@ import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/context/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
-import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
@@ -94,6 +95,7 @@ export default function BillDetailScreen() {
   const escalateMutation = useEscalateBill();
 
   const isMd = authUser?.role === 'md';
+  const canAttach = authUser?.role === 'md' || authUser?.role === 'payment_assistant';
   const attachments = attachmentsData?.attachments ?? [];
 
   const actionOptions: ActionOption[] = [
@@ -180,9 +182,31 @@ export default function BillDetailScreen() {
     }
   };
 
-  const handleDownload = async (attachmentId: string) => {
-    const url = `${API_BASE}/api/attachments/${attachmentId}/download`;
-    await WebBrowser.openBrowserAsync(url);
+  const handleDownload = async (attachmentId: string, fileName: string) => {
+    try {
+      const url = `${API_BASE}/api/attachments/${attachmentId}/download`;
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) {
+        Alert.alert('Download Failed', 'Could not download the file. Please try again.');
+        return;
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      uint8Array.forEach(byte => { binary += String.fromCharCode(byte); });
+      const base64 = btoa(binary);
+      const localPath = (FileSystem.cacheDirectory ?? '') + fileName;
+      await FileSystem.writeAsStringAsync(localPath, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(localPath);
+      } else {
+        Alert.alert('Download Saved', `File saved: ${fileName}`);
+      }
+    } catch {
+      Alert.alert('Download Failed', 'Could not download the file. Please try again.');
+    }
   };
 
   const handleAction = async (actionId: string, comment: string, amount?: number) => {
@@ -269,21 +293,23 @@ export default function BillDetailScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
               Attachments{attachments.length > 0 ? ` (${attachments.length})` : ''}
             </Text>
-            <Pressable
-              style={[
-                styles.attachBtn,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                isUploading && { opacity: 0.6 },
-              ]}
-              onPress={handleAttachFile}
-              disabled={isUploading}
-            >
-              {isUploading ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={[styles.attachBtnText, { color: colors.primary }]}>+ Attach File</Text>
-              )}
-            </Pressable>
+            {canAttach && (
+              <Pressable
+                style={[
+                  styles.attachBtn,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  isUploading && { opacity: 0.6 },
+                ]}
+                onPress={handleAttachFile}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={[styles.attachBtnText, { color: colors.primary }]}>+ Attach File</Text>
+                )}
+              </Pressable>
+            )}
           </View>
 
           {attachments.length === 0 ? (
@@ -299,7 +325,7 @@ export default function BillDetailScreen() {
                     styles.attachmentRow,
                     index < attachments.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                   ]}
-                  onPress={() => handleDownload(attachment.id)}
+                  onPress={() => handleDownload(attachment.id, attachment.fileName)}
                 >
                   <View style={styles.attachmentInfo}>
                     <Text style={[styles.attachmentName, { color: colors.primary }]} numberOfLines={1}>
