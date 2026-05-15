@@ -1,22 +1,42 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Pressable, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Pressable, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useLocalSearchParams } from 'expo-router';
-import { useGetBill, getGetBillQueryKey, useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useAddBillComment, useEscalateBill } from '@workspace/api-client-react';
+import {
+  useGetBill,
+  getGetBillQueryKey,
+  getListBillsQueryKey,
+  useApproveBill,
+  useRejectBill,
+  useHoldBill,
+  usePartialApproveBill,
+  useAddBillComment,
+  useEscalateBill,
+} from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText } from '@/components/finance/AmountText';
 import { StatusBadge } from '@/components/finance/StatusBadge';
 import { PriorityBadge } from '@/components/finance/PriorityBadge';
 import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/context/AuthContext';
+
+const ACTION_LABELS: Record<string, string> = {
+  approve: 'Bill approved',
+  partial: 'Partial approval recorded',
+  reject: 'Bill rejected',
+  hold: 'Bill placed on hold',
+  escalate: 'Bill escalated to urgent',
+  comment: 'Comment added',
+};
 
 export default function BillDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const { user: authUser } = useAuth();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
 
   const { data: bill, isLoading, refetch } = useGetBill(
@@ -34,12 +54,10 @@ export default function BillDetailScreen() {
   const isMd = authUser?.role === 'md';
 
   const actionOptions: ActionOption[] = [
-    ...(isMd ? [
-      { id: 'approve', label: 'Approve', icon: 'check-circle' as const, color: colors.success },
-      { id: 'partial', label: 'Partial Approve', icon: 'pie-chart' as const, color: '#3B82F6', requiresAmount: true },
-      { id: 'reject', label: 'Reject', icon: 'x-circle' as const, color: colors.destructive },
-      { id: 'hold', label: 'Hold', icon: 'pause-circle' as const, color: '#F59E0B' },
-    ] : []),
+    { id: 'approve', label: 'Approve', icon: 'check-circle', color: colors.success },
+    { id: 'partial', label: 'Partial Approve', icon: 'pie-chart', color: '#3B82F6', requiresAmount: true },
+    { id: 'reject', label: 'Reject', icon: 'x-circle', color: colors.destructive },
+    { id: 'hold', label: 'Hold', icon: 'pause-circle', color: '#F59E0B' },
     { id: 'escalate', label: 'Escalate', icon: 'alert-triangle', color: '#EF4444' },
     { id: 'comment', label: 'Add Comment', icon: 'message-square', color: colors.primary },
   ];
@@ -66,9 +84,16 @@ export default function BillDetailScreen() {
       } else if (actionId === 'comment') {
         await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: authUser?.id ?? '' } });
       }
-      refetch();
+
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() }),
+      ]);
+
+      Alert.alert('Done', ACTION_LABELS[actionId] ?? 'Action completed.');
     } catch (error) {
-      void error;
+      console.error('[BillDetail] action error:', error);
+      Alert.alert('Action Failed', 'Could not complete the action. Please check your connection and try again.');
     }
   };
 
@@ -82,7 +107,7 @@ export default function BillDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, isMd && styles.scrollContentWithBar]}>
         <View style={styles.header}>
           <Text style={[styles.vendor, { color: colors.foreground }]}>{bill.vendorName}</Text>
           <AmountText amount={bill.amount} style={[styles.amount, { color: colors.primary }]} />
@@ -148,27 +173,36 @@ export default function BillDetailScreen() {
             <Text style={[styles.commentText, { color: colors.foreground }]}>{comment.text}</Text>
           </View>
         ))}
-
-        <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={[styles.bottomBar, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) }]}>
-        <Pressable 
-          style={[styles.mainActionBtn, { backgroundColor: colors.primary }]}
-          onPress={() => setIsActionSheetVisible(true)}
-        >
-          <Text style={[styles.mainActionText, { color: colors.primaryForeground }]}>Take Action</Text>
-        </Pressable>
-      </View>
+      {isMd && (
+        <>
+          <View style={[styles.bottomBar, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <Pressable
+              style={[styles.mainActionBtn, { backgroundColor: colors.primary }]}
+              onPress={() => setIsActionSheetVisible(true)}
+            >
+              <Text style={[styles.mainActionText, { color: colors.primaryForeground }]}>Take Action</Text>
+            </Pressable>
+          </View>
 
-      <ActionSheet
-        isVisible={isActionSheetVisible}
-        onClose={() => setIsActionSheetVisible(false)}
-        title="Command Control"
-        options={actionOptions}
-        onAction={handleAction}
-        isLoading={approveMutation.isPending || rejectMutation.isPending || holdMutation.isPending || partialMutation.isPending || commentMutation.isPending || escalateMutation.isPending}
-      />
+          <ActionSheet
+            isVisible={isActionSheetVisible}
+            onClose={() => setIsActionSheetVisible(false)}
+            title="Command Control"
+            options={actionOptions}
+            onAction={handleAction}
+            isLoading={
+              approveMutation.isPending ||
+              rejectMutation.isPending ||
+              holdMutation.isPending ||
+              partialMutation.isPending ||
+              commentMutation.isPending ||
+              escalateMutation.isPending
+            }
+          />
+        </>
+      )}
     </View>
   );
 }
@@ -180,6 +214,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     gap: 24,
+  },
+  scrollContentWithBar: {
+    paddingBottom: 120,
   },
   header: {
     alignItems: 'center',
