@@ -19,13 +19,17 @@ router.get("/notifications", async (req, res): Promise<void> => {
 });
 
 router.post("/notifications/:id/read", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  // Fetch first so we can verify ownership
+  const [existing] = await db.select().from(notificationsTable).where(eq(notificationsTable.id, rawId!));
+  if (!existing) { res.status(404).json({ error: "Notification not found" }); return; }
+  if (actor.role !== "md" && existing.userId !== actor.id) { res.status(403).json({ error: "Forbidden" }); return; }
   const [notification] = await db
     .update(notificationsTable)
     .set({ isRead: true })
     .where(eq(notificationsTable.id, rawId!))
     .returning();
-  if (!notification) { res.status(404).json({ error: "Notification not found" }); return; }
   res.json(notification);
 });
 

@@ -33,9 +33,32 @@ app.use(
   }),
 );
 
+// Build an explicit origin allowlist from REPLIT_DOMAINS (comma-separated).
+// Falls back to ALLOWED_ORIGINS for local/custom overrides.
+// In development, also allow localhost on any port.
+const _replitDomains = (process.env["REPLIT_DOMAINS"] ?? "")
+  .split(",")
+  .map(d => d.trim())
+  .filter(Boolean)
+  .map(d => `https://${d}`);
+const _extraOrigins = (process.env["ALLOWED_ORIGINS"] ?? "")
+  .split(",")
+  .map(d => d.trim())
+  .filter(Boolean);
+const _allowedOrigins = new Set([..._replitDomains, ..._extraOrigins]);
+
 app.use(
   cors({
-    origin: true,
+    origin(origin, callback) {
+      // Allow requests with no origin (server-to-server, curl, native mobile)
+      if (!origin) return callback(null, true);
+      if (process.env.NODE_ENV !== "production") {
+        // Allow any localhost origin in development
+        if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return callback(null, true);
+      }
+      if (_allowedOrigins.has(origin)) return callback(null, true);
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
     credentials: true,
   }),
 );

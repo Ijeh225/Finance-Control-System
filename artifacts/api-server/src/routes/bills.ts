@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, usersTable } from "@workspace/db";
+import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -28,19 +28,44 @@ async function notify(userId: string, type: string, title: string, body: string,
   });
 }
 
+type Actor = { id: string; name: string; role: string };
+
+/**
+ * Fetch a bill and check read/write access.
+ * MD: unrestricted. Non-MD: must be createdBy the actor.
+ * Returns { bill, forbidden } — caller must handle both cases.
+ */
+async function loadBill(billId: string, actor: Actor) {
+  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
+  if (!bill) return { bill: null, forbidden: false };
+  if (actor.role !== "md" && bill.createdBy !== actor.id) return { bill, forbidden: true };
+  return { bill, forbidden: false };
+}
+
+// ─── List ────────────────────────────────────────────────────────────────────
+
 router.get("/bills", async (req, res): Promise<void> => {
-  const { status, userId, vendorId, priority, from, to } = req.query as Record<string, string>;
+  const actor = req.user!;
+  const query = req.query as Record<string, string>;
+  const { status, vendorId, priority, from, to } = query;
+
+  // Non-MD: always scoped to their own bills; ignore client-supplied userId
+  const effectiveUserId = actor.role === "md" ? query["userId"] : actor.id;
+
   const conditions: ReturnType<typeof eq>[] = [];
+  if (effectiveUserId) conditions.push(eq(billsTable.createdBy, effectiveUserId));
   if (status) conditions.push(eq(billsTable.status, status as "pending"));
-  if (userId) conditions.push(eq(billsTable.createdBy, userId));
   if (vendorId) conditions.push(eq(billsTable.vendorId, vendorId));
   if (priority) conditions.push(eq(billsTable.priority, priority as "low"));
   if (from) conditions.push(gte(billsTable.scheduledDate, from));
   if (to) conditions.push(lte(billsTable.scheduledDate, to));
+
   const bills = await db.select().from(billsTable).where(conditions.length ? and(...conditions) : undefined);
   const total = bills.reduce((a, b) => a + parseFloat(String(b.amount)), 0);
   res.json({ bills: bills.map(b => formatBill(b as Record<string, unknown>)), total });
 });
+
+// ─── Create ──────────────────────────────────────────────────────────────────
 
 router.post("/bills", async (req, res): Promise<void> => {
   const actor = req.user!;
@@ -69,10 +94,15 @@ router.post("/bills", async (req, res): Promise<void> => {
   res.status(201).json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
+// ─── Read single ─────────────────────────────────────────────────────────────
+
 router.get("/bills/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
-  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
+  const { bill, forbidden } = await loadBill(rawId!, actor);
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const [comments, auditEntries, vendor] = await Promise.all([
     db.select().from(commentsTable).where(eq(commentsTable.billId, rawId!)),
     db.select().from(auditTable).where(eq(auditTable.billId, rawId!)),
@@ -92,8 +122,15 @@ router.get("/bills/:id", async (req, res): Promise<void> => {
   });
 });
 
+// ─── Edit ────────────────────────────────────────────────────────────────────
+
 router.patch("/bills/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill: existing, forbidden } = await loadBill(rawId!, actor);
+  if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const { description, amount, scheduledDate, dueDate, walletId, priority } = req.body;
   const updates: Record<string, unknown> = {};
   if (description) updates["description"] = description;
@@ -102,13 +139,17 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
   if (dueDate) updates["dueDate"] = dueDate;
   if (walletId) updates["walletId"] = walletId;
   if (priority) updates["priority"] = priority;
+
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
+// ─── MD-only actions ─────────────────────────────────────────────────────────
+
 router.post("/bills/:id/approve", async (req, res): Promise<void> => {
   const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can approve bills" }); return; }
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment, approvedAmount } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
@@ -122,6 +163,7 @@ router.post("/bills/:id/approve", async (req, res): Promise<void> => {
 
 router.post("/bills/:id/reject", async (req, res): Promise<void> => {
   const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can reject bills" }); return; }
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
@@ -135,6 +177,7 @@ router.post("/bills/:id/reject", async (req, res): Promise<void> => {
 
 router.post("/bills/:id/hold", async (req, res): Promise<void> => {
   const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can hold bills" }); return; }
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { comment, rescheduleDate } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
@@ -150,6 +193,7 @@ router.post("/bills/:id/hold", async (req, res): Promise<void> => {
 
 router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can partially approve bills" }); return; }
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const { approvedAmount, comment } = req.body ?? {};
   if (!approvedAmount) { res.status(400).json({ error: "approvedAmount is required" }); return; }
@@ -163,20 +207,29 @@ router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
+// ─── Escalate (creator or MD) ─────────────────────────────────────────────────
+
 router.post("/bills/:id/escalate", async (req, res): Promise<void> => {
   const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
-  const { comment } = req.body ?? {};
-  const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
+  const { bill: existing, forbidden } = await loadBill(rawId!, actor);
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+  const { comment } = req.body ?? {};
   const [bill] = await db.update(billsTable).set({ priority: "urgent" }).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "escalated", comment ?? "Bill escalated to urgent");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
 router.get("/bills/:id/comments", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
   const comments = await db.select().from(commentsTable).where(eq(commentsTable.billId, rawId!));
   res.json({ comments });
 });
@@ -184,9 +237,11 @@ router.get("/bills/:id/comments", async (req, res): Promise<void> => {
 router.post("/bills/:id/comments", async (req, res): Promise<void> => {
   const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
   const { text } = req.body;
   if (!text) { res.status(400).json({ error: "text is required" }); return; }
-  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   const [comment] = await db.insert(commentsTable).values({
     id: uid(), billId: rawId!, authorId: actor.id,
     authorName: actor.name,
@@ -194,14 +249,20 @@ router.post("/bills/:id/comments", async (req, res): Promise<void> => {
     text,
   }).returning();
   await addAudit(rawId!, actor.id, actor.name, "commented", text);
-  if (bill && bill.createdBy !== actor.id) {
+  if (bill.createdBy !== actor.id) {
     await notify(bill.createdBy, "comment_added", "New Comment", `${actor.name} commented on your bill: "${text.slice(0, 60)}"`, rawId!);
   }
   res.status(201).json(comment);
 });
 
+// ─── Audit trail ─────────────────────────────────────────────────────────────
+
 router.get("/bills/:id/audit", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
   const entries = await db.select().from(auditTable).where(eq(auditTable.billId, rawId!));
   res.json({ entries });
 });
