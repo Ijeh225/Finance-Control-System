@@ -12,6 +12,10 @@ import {
   usePartialApproveBill,
   useAddBillComment,
   useEscalateBill,
+  useListBillAttachments,
+  getListBillAttachmentsQueryKey,
+  useRequestBillAttachmentUpload,
+  useConfirmBillAttachment,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +25,33 @@ import { PriorityBadge } from '@/components/finance/PriorityBadge';
 import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/context/AuthContext';
+import * as DocumentPicker from 'expo-document-picker';
+import * as WebBrowser from 'expo-web-browser';
+
+const API_BASE = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'application/octet-stream',
+]);
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const ACTION_LABELS: Record<string, string> = {
   approve: 'Bill approved',
@@ -38,11 +69,22 @@ export default function BillDetailScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const billId = id as string;
 
   const { data: bill, isLoading, refetch } = useGetBill(
-    id as string,
-    { query: { enabled: !!id, queryKey: getGetBillQueryKey(id as string) } }
+    billId,
+    { query: { enabled: !!billId, queryKey: getGetBillQueryKey(billId) } }
   );
+
+  const { data: attachmentsData, refetch: refetchAttachments } = useListBillAttachments(
+    billId,
+    { query: { enabled: !!billId, queryKey: getListBillAttachmentsQueryKey(billId) } }
+  );
+
+  const requestUploadMutation = useRequestBillAttachmentUpload();
+  const confirmMutation = useConfirmBillAttachment();
 
   const approveMutation = useApproveBill();
   const rejectMutation = useRejectBill();
@@ -52,6 +94,7 @@ export default function BillDetailScreen() {
   const escalateMutation = useEscalateBill();
 
   const isMd = authUser?.role === 'md';
+  const attachments = attachmentsData?.attachments ?? [];
 
   const actionOptions: ActionOption[] = [
     { id: 'approve', label: 'Approve', icon: 'check-circle', color: colors.success },
@@ -62,27 +105,107 @@ export default function BillDetailScreen() {
     { id: 'comment', label: 'Add Comment', icon: 'message-square', color: colors.primary },
   ];
 
+  const handleAttachFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'image/*',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/csv',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      if (!asset) return;
+
+      const mimeType = asset.mimeType ?? 'application/octet-stream';
+      const fileSize = asset.size ?? 0;
+      const fileName = asset.name;
+
+      if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+        Alert.alert('Invalid File Type', 'Please attach a PDF, image, Word, Excel, or CSV file.');
+        return;
+      }
+
+      if (fileSize > MAX_FILE_SIZE) {
+        Alert.alert('File Too Large', 'The file must be smaller than 20 MB.');
+        return;
+      }
+
+      setIsUploading(true);
+
+      // Step 1: request presigned upload URL
+      const uploadResp = await requestUploadMutation.mutateAsync({
+        id: billId,
+        data: { fileName, fileSize, mimeType },
+      });
+
+      const { attachmentId, uploadUrl } = uploadResp;
+
+      // Step 2: fetch file as blob and PUT to presigned URL
+      const fileRes = await fetch(asset.uri);
+      const blob = await fileRes.blob();
+
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType },
+        body: blob,
+      });
+
+      if (!putRes.ok) {
+        throw new Error(`Storage upload failed: ${putRes.status}`);
+      }
+
+      // Step 3: confirm the upload
+      await confirmMutation.mutateAsync({ id: billId, attachmentId });
+
+      await Promise.all([
+        refetchAttachments(),
+        queryClient.invalidateQueries({ queryKey: getListBillAttachmentsQueryKey(billId) }),
+      ]);
+
+      Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Uploaded', `${fileName} attached successfully.`);
+    } catch {
+      Alert.alert('Upload Failed', 'Could not upload the file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownload = async (attachmentId: string) => {
+    const url = `${API_BASE}/api/attachments/${attachmentId}/download`;
+    await WebBrowser.openBrowserAsync(url);
+  };
+
   const handleAction = async (actionId: string, comment: string, amount?: number) => {
-    if (!id) return;
+    if (!billId) return;
 
     try {
       if (actionId === 'approve') {
-        await approveMutation.mutateAsync({ id: id as string, data: { comment } });
+        await approveMutation.mutateAsync({ id: billId, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'partial' && amount) {
-        await partialMutation.mutateAsync({ id: id as string, data: { comment, approvedAmount: amount } });
+        await partialMutation.mutateAsync({ id: billId, data: { comment, approvedAmount: amount } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else if (actionId === 'reject') {
-        await rejectMutation.mutateAsync({ id: id as string, data: { comment } });
+        await rejectMutation.mutateAsync({ id: billId, data: { comment } });
         Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       } else if (actionId === 'hold') {
-        await holdMutation.mutateAsync({ id: id as string, data: { comment } });
+        await holdMutation.mutateAsync({ id: billId, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else if (actionId === 'escalate') {
-        await escalateMutation.mutateAsync({ id: id as string, data: { comment } });
+        await escalateMutation.mutateAsync({ id: billId, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       } else if (actionId === 'comment') {
-        await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: authUser?.id ?? '' } });
+        await commentMutation.mutateAsync({ id: billId, data: { text: comment, authorId: authUser?.id ?? '' } });
       }
 
       await Promise.all([
@@ -91,8 +214,7 @@ export default function BillDetailScreen() {
       ]);
 
       Alert.alert('Done', ACTION_LABELS[actionId] ?? 'Action completed.');
-    } catch (error) {
-      console.error('[BillDetail] action error:', error);
+    } catch {
       Alert.alert('Action Failed', 'Could not complete the action. Please check your connection and try again.');
     }
   };
@@ -108,6 +230,7 @@ export default function BillDetailScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, isMd && styles.scrollContentWithBar]}>
+
         <View style={styles.header}>
           <Text style={[styles.vendor, { color: colors.foreground }]}>{bill.vendorName}</Text>
           <AmountText amount={bill.amount} style={[styles.amount, { color: colors.primary }]} />
@@ -136,6 +259,63 @@ export default function BillDetailScreen() {
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>Wallet</Text>
               <Text style={[styles.infoValue, { color: colors.foreground }]}>{bill.walletName}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Attachments */}
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              Attachments{attachments.length > 0 ? ` (${attachments.length})` : ''}
+            </Text>
+            <Pressable
+              style={[
+                styles.attachBtn,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                isUploading && { opacity: 0.6 },
+              ]}
+              onPress={handleAttachFile}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={[styles.attachBtnText, { color: colors.primary }]}>+ Attach File</Text>
+              )}
+            </Pressable>
+          </View>
+
+          {attachments.length === 0 ? (
+            <View style={[styles.emptyAttachments, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No attachments yet</Text>
+            </View>
+          ) : (
+            <View style={[styles.attachmentList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {attachments.map((attachment, index) => (
+                <Pressable
+                  key={attachment.id}
+                  style={[
+                    styles.attachmentRow,
+                    index < attachments.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                  ]}
+                  onPress={() => handleDownload(attachment.id)}
+                >
+                  <View style={styles.attachmentInfo}>
+                    <Text style={[styles.attachmentName, { color: colors.primary }]} numberOfLines={1}>
+                      {attachment.fileName}
+                    </Text>
+                    <Text style={[styles.attachmentMeta, { color: colors.mutedForeground }]}>
+                      {[
+                        attachment.uploadedByName,
+                        new Date(attachment.uploadedAt).toLocaleDateString(),
+                        formatBytes(attachment.fileSize),
+                      ].filter(Boolean).join(' \u2022 ')}
+                    </Text>
+                  </View>
+                  <Text style={[styles.downloadArrow, { color: colors.primary }]}>{'\u2193'}</Text>
+                </Pressable>
+              ))}
             </View>
           )}
         </View>
@@ -253,6 +433,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  attachBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    minWidth: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 34,
+  },
+  attachBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyAttachments: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+  },
+  attachmentList: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  attachmentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  attachmentInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  attachmentName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  attachmentMeta: {
+    fontSize: 12,
+  },
+  downloadArrow: {
     fontSize: 18,
     fontWeight: '700',
   },
