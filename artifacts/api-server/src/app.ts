@@ -13,6 +13,10 @@ if (!process.env.SESSION_SECRET) {
 
 const app: Express = express();
 
+// Trust the first proxy hop so express-session sets secure cookies correctly
+// when running behind Replit's HTTPS reverse proxy.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
