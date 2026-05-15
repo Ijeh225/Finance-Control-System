@@ -8,6 +8,19 @@ function today() {
   return new Date().toISOString().split("T")[0]!;
 }
 
+/**
+ * Resolve the effective userId filter based on session role.
+ * MD: may pass ?userId= to filter; omit to see all users.
+ * Non-MD: always scoped to their own id.
+ */
+function resolveUserId(req: { user?: { id: string; role: string }; query: Record<string, unknown> }): string | undefined {
+  const actor = req.user!;
+  if (actor.role === "md") {
+    return req.query["userId"] as string | undefined;
+  }
+  return actor.id;
+}
+
 function formatBill(b: Record<string, unknown>) {
   return {
     ...b,
@@ -19,7 +32,7 @@ function formatBill(b: Record<string, unknown>) {
 }
 
 router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const conds = userId ? [eq(billsTable.createdBy, userId)] : [];
   const bills = await db.select().from(billsTable).where(
     and(...conds, sql`${billsTable.outstandingBalance} > 0`)
@@ -64,7 +77,7 @@ router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> =
 });
 
 router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const conds = [eq(billsTable.status, "pending")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conds));
@@ -73,7 +86,7 @@ router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
 });
 
 router.get("/reports/paid-today", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const t = today();
   const conds = [eq(billsTable.status, "paid")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
@@ -84,7 +97,7 @@ router.get("/reports/paid-today", async (req, res): Promise<void> => {
 });
 
 router.get("/reports/partial-payments", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const conds = [eq(billsTable.status, "partial")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conds));

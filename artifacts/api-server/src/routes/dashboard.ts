@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
-import { db, billsTable, walletsTable, notificationsTable, auditTable, usersTable } from "@workspace/db";
+import { db, billsTable, walletsTable, notificationsTable, auditTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -11,8 +11,21 @@ function tomorrow() {
   return new Date(Date.now() + 86400000).toISOString().split("T")[0]!;
 }
 
+/**
+ * Resolve the effective userId filter based on session role.
+ * MD: may pass ?userId= to filter by a specific user; omit to see all.
+ * Non-MD: always scoped to their own id.
+ */
+function effectiveUserId(req: { user?: { id: string; role: string }; query: Record<string, unknown> }): string | undefined {
+  const actor = req.user!;
+  if (actor.role === "md") {
+    return req.query["userId"] as string | undefined;
+  }
+  return actor.id;
+}
+
 router.get("/dashboard/summary", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const userFilter = userId ? eq(billsTable.createdBy, userId) : undefined;
 
   const t = today();
@@ -62,7 +75,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
 });
 
 router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const t = today();
   const conditions = [eq(billsTable.scheduledDate, t)];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
@@ -72,7 +85,7 @@ router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
 });
 
 router.get("/dashboard/scheduled-tomorrow", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const tom = tomorrow();
   const conditions = [eq(billsTable.scheduledDate, tom)];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
@@ -82,7 +95,7 @@ router.get("/dashboard/scheduled-tomorrow", async (req, res): Promise<void> => {
 });
 
 router.get("/dashboard/overdue", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const conditions = [eq(billsTable.status, "overdue")];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conditions));
@@ -97,7 +110,7 @@ router.get("/dashboard/wallet-balances", async (_req, res): Promise<void> => {
 });
 
 router.get("/dashboard/activity", async (req, res): Promise<void> => {
-  const userId = req.query["userId"] as string | undefined;
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const limit = parseInt(String(req.query["limit"] ?? "20"));
   const conditions = userId ? [eq(auditTable.userId, userId)] : [];
   const entries = await db

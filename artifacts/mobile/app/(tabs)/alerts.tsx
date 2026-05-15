@@ -5,14 +5,17 @@ import { Feather } from '@expo/vector-icons';
 import { useListNotifications, getListNotificationsQueryKey, useMarkNotificationRead, useMarkAllNotificationsRead, NotificationType } from '@workspace/api-client-react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AlertsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user: authUser } = useAuth();
+  const currentUserId = authUser?.id ?? '';
 
   const { data, isLoading, refetch } = useListNotifications(
-    { userId: 'md' },
-    { query: { queryKey: getListNotificationsQueryKey({ userId: 'md' }) } }
+    { userId: currentUserId },
+    { query: { enabled: !!currentUserId, queryKey: getListNotificationsQueryKey({ userId: currentUserId }) } }
   );
 
   const { mutate: markRead } = useMarkNotificationRead();
@@ -30,7 +33,7 @@ export default function AlertsScreen() {
   };
 
   const handleMarkAllRead = () => {
-    markAllRead({ data: { userId: 'md' } }, { onSuccess: () => refetch() });
+    markAllRead({ data: { userId: currentUserId } }, { onSuccess: () => refetch() });
   };
 
   const handleNotificationPress = (notification: any) => {
