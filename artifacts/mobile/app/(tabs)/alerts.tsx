@@ -2,24 +2,41 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
-import { useListNotifications, getListNotificationsQueryKey, useMarkNotificationRead, useMarkAllNotificationsRead, NotificationType } from '@workspace/api-client-react';
+import {
+  useListNotifications,
+  getListNotificationsQueryKey,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  NotificationType,
+} from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AlertsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user: authUser } = useAuth();
+  const queryClient = useQueryClient();
   const currentUserId = authUser?.id ?? '';
+
+  const notificationsQueryKey = getListNotificationsQueryKey({ userId: currentUserId });
 
   const { data, isLoading, refetch } = useListNotifications(
     { userId: currentUserId },
-    { query: { enabled: !!currentUserId, queryKey: getListNotificationsQueryKey({ userId: currentUserId }) } }
+    { query: { enabled: !!currentUserId, queryKey: notificationsQueryKey } }
   );
+
+  const unreadCount = data?.unreadCount ?? 0;
 
   const { mutate: markRead } = useMarkNotificationRead();
   const { mutate: markAllRead } = useMarkAllNotificationsRead();
+
+  const invalidateAndRefetch = () => {
+    queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
+    refetch();
+  };
 
   const getIcon = (type: NotificationType) => {
     switch (type) {
@@ -33,12 +50,18 @@ export default function AlertsScreen() {
   };
 
   const handleMarkAllRead = () => {
-    markAllRead({ data: { userId: currentUserId } }, { onSuccess: () => refetch() });
+    markAllRead(
+      { data: { userId: currentUserId } },
+      { onSuccess: invalidateAndRefetch }
+    );
   };
 
-  const handleNotificationPress = (notification: any) => {
+  const handleNotificationPress = (notification: { id: string; isRead: boolean; billId?: string | null }) => {
     if (!notification.isRead) {
-      markRead({ id: notification.id }, { onSuccess: () => refetch() });
+      markRead(
+        { id: notification.id },
+        { onSuccess: invalidateAndRefetch }
+      );
     }
     if (notification.billId) {
       router.push(`/bill/${notification.billId}`);
@@ -47,19 +70,27 @@ export default function AlertsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
+      <Tabs.Screen
+        options={{
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+        }}
+      />
+
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.foreground }]}>Alerts</Text>
-        <Pressable onPress={handleMarkAllRead}>
-          <Text style={[styles.markAll, { color: colors.primary }]}>Mark all read</Text>
-        </Pressable>
+        {unreadCount > 0 && (
+          <Pressable onPress={handleMarkAllRead}>
+            <Text style={[styles.markAll, { color: colors.primary }]}>Mark all read</Text>
+          </Pressable>
+        )}
       </View>
 
       <FlatList
-        data={data?.notifications || []}
+        data={data?.notifications ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom + 84 }
+          { paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom + 84 },
         ]}
         renderItem={({ item }) => {
           const icon = getIcon(item.type);
@@ -76,8 +107,18 @@ export default function AlertsScreen() {
               </View>
               <View style={styles.content}>
                 <View style={styles.alertHeader}>
-                  <Text style={[styles.alertTitle, { color: colors.foreground }]}>{item.title}</Text>
-                  {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+                  <Text
+                    style={[
+                      styles.alertTitle,
+                      { color: colors.foreground },
+                      !item.isRead && styles.alertTitleUnread,
+                    ]}
+                  >
+                    {item.title}
+                  </Text>
+                  {!item.isRead && (
+                    <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
+                  )}
                 </View>
                 <Text style={[styles.alertBody, { color: colors.secondaryForeground }]}>{item.body}</Text>
                 <Text style={[styles.time, { color: colors.mutedForeground }]}>
@@ -149,12 +190,18 @@ const styles = StyleSheet.create({
   },
   alertTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
+    flex: 1,
+  },
+  alertTitleUnread: {
+    fontWeight: '800',
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    marginLeft: 8,
+    flexShrink: 0,
   },
   alertBody: {
     fontSize: 14,
