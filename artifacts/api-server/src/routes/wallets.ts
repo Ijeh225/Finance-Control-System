@@ -105,7 +105,7 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     // Lock both rows with consistent ordering to prevent deadlocks
     const [first, second] = [fromWalletId, toWalletId].sort();
     const locked = await tx.execute<{ id: string; balance: string; ownedBy: string | null; name: string }>(
-      sql`SELECT id, balance, "ownedBy", name FROM wallets WHERE id = ${first} OR id = ${second} ORDER BY id FOR UPDATE`
+      sql`SELECT id, balance, owned_by AS "ownedBy", name FROM wallets WHERE id = ${first} OR id = ${second} ORDER BY id FOR UPDATE`
     );
 
     const fromWallet = locked.rows.find(r => r.id === fromWalletId);
