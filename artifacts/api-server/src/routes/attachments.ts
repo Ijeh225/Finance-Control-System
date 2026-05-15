@@ -46,7 +46,7 @@ async function notifyAttachmentUploaded(
   fileName: string,
 ) {
   const title = "New Attachment";
-  const body = `New attachment on "${billDescription}": ${fileName}`;
+  const body = `New attachment on ${billDescription}: ${fileName}`;
 
   // Notify every MD user
   const mdUsers = await db.select({ id: usersTable.id })
@@ -238,6 +238,8 @@ router.post("/bills/:id/attachments/:attachmentId/confirm", async (req, res): Pr
     return;
   }
 
+  const alreadyConfirmed = attachment.confirmed;
+
   const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
   if (!bill) {
     res.status(404).json({ error: "Bill not found" });
@@ -252,7 +254,10 @@ router.post("/bills/:id/attachments/:attachmentId/confirm", async (req, res): Pr
     .set({ hasAttachment: true })
     .where(eq(billsTable.id, billId));
 
-  await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, actor.id, attachment.fileName);
+  // Only notify on the first confirmation to prevent duplicate alerts
+  if (!alreadyConfirmed) {
+    await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, actor.id, attachment.fileName);
+  }
 
   res.json({ ok: true });
 });
