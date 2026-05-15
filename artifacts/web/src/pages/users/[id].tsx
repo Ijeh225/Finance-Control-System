@@ -60,6 +60,7 @@ export default function UserProfile() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetUserProfileQueryKey(id!) });
         qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
+        qc.invalidateQueries({ queryKey: getListWalletsQueryKey({ userId: id }) });
         setShowAddWallet(false);
         setWalletForm({ name: "", bankName: "", accountNumber: "", balance: "", currency: "NGN" });
         toast({ title: "Wallet created" });

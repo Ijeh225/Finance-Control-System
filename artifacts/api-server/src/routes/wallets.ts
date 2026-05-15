@@ -74,8 +74,8 @@ router.get("/wallets/:id", async (req, res): Promise<void> => {
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
 
-  // Non-MD can only access their own wallet
-  if (actor.role !== "md" && wallet.ownedBy && wallet.ownedBy !== actor.id) {
+  // Non-MD can only access their own wallet; null-owned wallets are also denied
+  if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
     res.status(403).json({ error: "Access denied" });
     return;
   }

@@ -81,7 +81,11 @@ export default function Audit() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-baseline gap-1.5">
-                        <span className="font-semibold text-sm">{entry.userName}</span>
+                        {entry.userId ? (
+                          <Link href={`/users/${entry.userId}`} className="font-semibold text-sm hover:underline">{entry.userName}</Link>
+                        ) : (
+                          <span className="font-semibold text-sm">{entry.userName}</span>
+                        )}
                         <span className="text-sm text-muted-foreground">{entry.action?.replace(/_/g, " ")}</span>
                         {entry.billId && (
                           <Link href={`/bills/${entry.billId}`} className="text-xs text-primary font-semibold hover:underline">
