@@ -1,0 +1,336 @@
+This platform is a private finance control system for the MD and selected treasury/payment assistants only. The system must feel like a modern executive financial command center with smooth navigation, clean dashboards, expandable pages, notifications, smart tables, charts, and interactive approval workflow.
+
+IMPORTANT FRONTEND ADJUSTMENT:
+The MD dashboard should not just display summary cards. Every summary card must be clickable and must open a detailed page related to that specific financial section.
+
+The frontend should feel premium, smart, modern, and executive-level.
+
+==================================================
+MD MAIN DASHBOARD STRUCTURE
+==================================================
+
+The MD dashboard should contain smart financial summary cards such as:
+
+- Total Scheduled Payments Today
+- Tomorrow’s Scheduled Payments
+- Pending Approval Bills
+- Approved but Unpaid Bills
+- Total Outstanding Liabilities
+- Overdue Bills
+- Wallet Balances
+- Total Paid Today
+- Partial Payments
+- Recent Transactions
+- Notifications
+- User Activity Summary
+
+Each card must be interactive/clickable.
+
+==================================================
+USER SWITCHING SYSTEM FOR MD
+==================================================
+
+The MD should have a smart user switch/dropdown selector at the top of the dashboard.
+
+Example:
+[ All Users ▼ ]
+
+When clicked, it should show:
+- Mr A
+- Mr B
+- Mr C
+- All Users
+
+When the MD selects a user:
+The dashboard automatically changes to that user’s workspace summary.
+
+Example:
+If MD clicks Mr A:
+The MD now sees:
+- Mr A’s scheduled payments
+- Mr A’s liabilities
+- Mr A’s pending approvals
+- Mr A’s wallet balances
+- Mr A’s vendors
+- Mr A’s recent transactions
+- Mr A’s notifications
+
+This should feel smooth and instant without reloading the whole app.
+
+==================================================
+TOTAL SCHEDULED PAYMENTS PAGE
+==================================================
+
+When the MD clicks:
+“Total Scheduled Payments”
+
+It should open a full detailed page showing:
+- All scheduled payments for that day
+- Grouped by user
+- Grouped by vendor
+- Grouped by priority
+- Grouped by due date
+
+Each payment row should contain:
+- Vendor/beneficiary name
+- Description of work done
+- Amount
+- Outstanding balance
+- Scheduled date
+- Wallet/account to debit from
+- Priority
+- Status
+- Created by
+- Attachment preview
+- Date created
+
+Each row must also have:
+- Approve button
+- Reject button
+- Hold button
+- Partial approve button
+- Comment button
+
+==================================================
+MD COMMENT SYSTEM
+==================================================
+
+The MD must be able to comment directly inside the payment page.
+
+Example comments:
+- Pay ₦50,000 first
+- Hold till tomorrow
+- Confirm invoice
+- Use Zenith wallet
+- Why is this amount high?
+- Approved
+- Reduce amount
+
+Once the MD comments:
+- The assigned user immediately receives notification
+- The comment appears inside the activity timeline
+- The comment is timestamped
+- The system stores who made the comment
+
+Each payment should have:
+- Internal conversation/comment thread
+- Activity timeline
+- Approval history
+
+==================================================
+TOMORROW’S SCHEDULED PAYMENTS
+==================================================
+
+When the MD clicks:
+“Tomorrow’s Scheduled Payments”
+
+It should open another detailed page showing:
+- All bills scheduled for tomorrow
+- Sorted by urgency
+- Sorted by user
+- Sorted by vendor
+- Sorted by amount
+
+The MD should also be able to:
+- Comment
+- Approve ahead
+- Hold payment
+- Move payment date
+- Change wallet/account
+- Request more details
+
+==================================================
+PENDING APPROVAL PAGE
+==================================================
+
+When the MD clicks:
+“Pending Approval Bills”
+
+Open a dedicated approval management page.
+
+This page should show:
+- Bills waiting for MD approval
+- Vendor details
+- User who created bill
+- Amount
+- Supporting proof
+- Outstanding vendor balance
+- Previous payments to that vendor
+- Priority level
+- Scheduled date
+
+The MD can:
+- Approve
+- Reject
+- Partially approve
+- Hold
+- Comment
+- Edit payment amount
+- Reassign wallet
+
+==================================================
+TOTAL OUTSTANDING LIABILITIES PAGE
+==================================================
+
+When clicked:
+Open a page showing:
+- Total amount owed
+- All beneficiaries/vendors owed money
+- Amount paid so far
+- Outstanding balance
+- Last payment date
+- Aging of liabilities
+
+Example aging:
+- 0–7 days
+- 8–14 days
+- 15–30 days
+- 30+ days overdue
+
+The MD should also see:
+- Which user created the liabilities
+- Total liability per user
+- Total liability per vendor
+
+==================================================
+OVERDUE BILLS PAGE
+==================================================
+
+When clicked:
+Open overdue management page.
+
+Show:
+- Overdue vendor bills
+- Number of overdue days
+- Amount owed
+- User responsible
+- Vendor contact
+- Last comment
+- Last payment made
+
+Allow MD to:
+- Escalate
+- Comment
+- Reschedule payment
+- Prioritize payment
+
+==================================================
+NOTIFICATION SYSTEM
+==================================================
+
+Notifications must work in real-time.
+
+Example notifications:
+- MD commented on your payment
+- Bill approved
+- Bill rejected
+- Partial payment approved
+- Wallet low balance
+- Vendor overdue warning
+- Duplicate bill detected
+
+Notifications should:
+- Show unread count
+- Have notification dropdown
+- Redirect directly to affected payment/bill
+- Include sound alert option
+
+==================================================
+BENEFICIARY/VENDOR RUNNING BALANCE SYSTEM
+==================================================
+
+This is extremely important.
+
+Every vendor/beneficiary should have:
+- Running balance account
+- Job history
+- Expense history
+- Partial payment history
+- Outstanding liabilities
+- Timeline of activities
+
+Example:
+Lucy today:
+₦100,000 for loading
+
+Tomorrow:
+₦100,000 for another work
+
+The system should automatically accumulate:
+Outstanding = ₦200,000
+
+If ₦50,000 is paid:
+Outstanding = ₦150,000
+
+The vendor profile page should show:
+- Total bills
+- Total paid
+- Outstanding
+- All job descriptions
+- Who created each expense
+- MD comments
+- Payment proofs
+- Attachments
+- Activity history
+
+==================================================
+REPORTS & EXPORTS
+==================================================
+
+The system must support:
+- Excel export
+- PDF export
+- Printable reports
+
+Downloadable reports:
+- Daily payment report
+- Scheduled payments
+- Outstanding liabilities
+- Vendor statement
+- Wallet statement
+- User activity
+- Partial payments
+- Approval logs
+- Audit trail
+
+==================================================
+AUDIT TRAIL
+==================================================
+
+Track every action:
+- Who created bill
+- Who edited bill
+- Who approved
+- Who commented
+- Who changed amount
+- Who changed payment date
+- Date/time of every action
+
+==================================================
+UI/UX DESIGN REQUIREMENTS
+==================================================
+
+The app must look:
+- Fancy
+- Premium
+- Executive
+- Smooth
+- Financial-grade
+- Modern
+- Mobile responsive
+
+Use:
+- Smart dashboard cards
+- Financial charts
+- Interactive tables
+- Sidebar navigation
+- Top navigation bar
+- Smooth dropdowns
+- Dark/light mode
+- Status badges
+- Sticky filters
+- Search system
+- Animated notifications
+- Modern finance-style interface
+
+The entire experience should feel like a private executive treasury control center for the MD.

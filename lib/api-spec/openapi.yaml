@@ -3,20 +3,38 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FinCommand Executive Treasury API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User management
+  - name: bills
+    description: Bills and payment management
+  - name: vendors
+    description: Vendor/beneficiary management
+  - name: wallets
+    description: Wallet/account management
+  - name: notifications
+    description: Notification management
+  - name: comments
+    description: Comment and activity management
+  - name: dashboard
+    description: Dashboard summary endpoints
+  - name: reports
+    description: Reports and exports
+  - name: audit
+    description: Audit trail
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +42,937 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── DASHBOARD ───────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: MD dashboard summary cards
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+          description: Filter by user ID (omit for all users)
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/scheduled-today:
+    get:
+      operationId: getScheduledToday
+      tags: [dashboard]
+      summary: All payments scheduled for today
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [user, vendor, priority, dueDate]
+      responses:
+        "200":
+          description: Today scheduled payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+
+  /dashboard/scheduled-tomorrow:
+    get:
+      operationId: getScheduledTomorrow
+      tags: [dashboard]
+      summary: All payments scheduled for tomorrow
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tomorrow scheduled payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+
+  /dashboard/overdue:
+    get:
+      operationId: getOverdueBills
+      tags: [dashboard]
+      summary: All overdue bills
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Overdue bills
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+
+  /dashboard/wallet-balances:
+    get:
+      operationId: getWalletBalances
+      tags: [dashboard]
+      summary: All wallet balances
+      responses:
+        "200":
+          description: Wallet balances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Wallet"
+                  totalBalance:
+                    type: number
+                required: [wallets, totalBalance]
+
+  /dashboard/activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent transaction activity
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                required: [activities]
+
+  # ─── USERS ───────────────────────────────────────────────────
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all treasury users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+                required: [users]
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserInput"
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a specific user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── BILLS ───────────────────────────────────────────────────
+  /bills:
+    get:
+      operationId: listBills
+      tags: [bills]
+      summary: List bills with optional filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, on_hold, partial, paid, overdue]
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, urgent]
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of bills
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+    post:
+      operationId: createBill
+      tags: [bills]
+      summary: Create a new bill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBillInput"
+      responses:
+        "201":
+          description: Created bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}:
+    get:
+      operationId: getBill
+      tags: [bills]
+      summary: Get bill details with comments and audit trail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+    patch:
+      operationId: updateBill
+      tags: [bills]
+      summary: Update bill fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBillInput"
+      responses:
+        "200":
+          description: Updated bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/approve:
+    post:
+      operationId: approveBill
+      tags: [bills]
+      summary: Approve a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                approvedAmount:
+                  type: number
+      responses:
+        "200":
+          description: Approved bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/reject:
+    post:
+      operationId: rejectBill
+      tags: [bills]
+      summary: Reject a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        "200":
+          description: Rejected bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/hold:
+    post:
+      operationId: holdBill
+      tags: [bills]
+      summary: Put a bill on hold
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                rescheduleDate:
+                  type: string
+      responses:
+        "200":
+          description: Bill on hold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/partial-approve:
+    post:
+      operationId: partialApproveBill
+      tags: [bills]
+      summary: Partially approve a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approvedAmount:
+                  type: number
+                comment:
+                  type: string
+              required: [approvedAmount]
+      responses:
+        "200":
+          description: Partially approved bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/escalate:
+    post:
+      operationId: escalateBill
+      tags: [bills]
+      summary: Escalate an overdue bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        "200":
+          description: Escalated bill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+
+  /bills/{id}/comments:
+    get:
+      operationId: getBillComments
+      tags: [comments]
+      summary: Get comments for a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+                required: [comments]
+    post:
+      operationId: addBillComment
+      tags: [comments]
+      summary: Add a comment to a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                authorId:
+                  type: string
+              required: [text, authorId]
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /bills/{id}/audit:
+    get:
+      operationId: getBillAudit
+      tags: [audit]
+      summary: Get audit trail for a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit trail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                required: [entries]
+
+  # ─── VENDORS ─────────────────────────────────────────────────
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List all vendors/beneficiaries
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vendors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vendor"
+                required: [vendors]
+    post:
+      operationId: createVendor
+      tags: [vendors]
+      summary: Create a new vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorInput"
+      responses:
+        "201":
+          description: Created vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/{id}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      summary: Get vendor profile with running balance and history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorDetail"
+
+  /vendors/{id}/liabilities:
+    get:
+      operationId: getVendorLiabilities
+      tags: [vendors]
+      summary: Get vendor liabilities with aging
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor liabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiabilityAging"
+
+  # ─── WALLETS ─────────────────────────────────────────────────
+  /wallets:
+    get:
+      operationId: listWallets
+      tags: [wallets]
+      summary: List all wallets/accounts
+      responses:
+        "200":
+          description: List of wallets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Wallet"
+                required: [wallets]
+    post:
+      operationId: createWallet
+      tags: [wallets]
+      summary: Create a new wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWalletInput"
+      responses:
+        "201":
+          description: Created wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallets/{id}:
+    get:
+      operationId: getWallet
+      tags: [wallets]
+      summary: Get wallet details and statement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Wallet details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletDetail"
+    patch:
+      operationId: updateWallet
+      tags: [wallets]
+      summary: Update wallet balance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                balance:
+                  type: number
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Updated wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  # ─── NOTIFICATIONS ───────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for current user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  unreadCount:
+                    type: integer
+                required: [notifications, unreadCount]
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+              required: [userId]
+      responses:
+        "200":
+          description: All notifications marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                required: [updated]
+
+  # ─── AUDIT TRAIL ─────────────────────────────────────────────
+  /audit:
+    get:
+      operationId: listAuditTrail
+      tags: [audit]
+      summary: Full audit trail with filters
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: billId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit trail entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                  total:
+                    type: integer
+                required: [entries, total]
+
+  # ─── REPORTS ─────────────────────────────────────────────────
+  /reports/outstanding-liabilities:
+    get:
+      operationId: getOutstandingLiabilities
+      tags: [reports]
+      summary: Outstanding liabilities with aging breakdown
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Outstanding liabilities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiabilitiesReport"
+
+  /reports/pending-approvals:
+    get:
+      operationId: getPendingApprovals
+      tags: [reports]
+      summary: All bills pending MD approval
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pending approvals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                  count:
+                    type: integer
+                required: [bills, total, count]
+
+  /reports/paid-today:
+    get:
+      operationId: getPaidToday
+      tags: [reports]
+      summary: Total paid today summary
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paid today
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                  count:
+                    type: integer
+                required: [bills, total, count]
+
+  /reports/partial-payments:
+    get:
+      operationId: getPartialPayments
+      tags: [reports]
+      summary: All partial payment records
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Partial payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +980,437 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [md, treasury, payment_assistant]
+        email:
+          type: string
+        phone:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, role, createdAt]
+
+    CreateUserInput:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [md, treasury, payment_assistant]
+        email:
+          type: string
+        phone:
+          type: string
+      required: [name, role]
+
+    Bill:
+      type: object
+      properties:
+        id:
+          type: string
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        approvedAmount:
+          type: number
+        paidAmount:
+          type: number
+        outstandingBalance:
+          type: number
+        scheduledDate:
+          type: string
+        dueDate:
+          type: string
+        walletId:
+          type: string
+        walletName:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        status:
+          type: string
+          enum: [pending, approved, rejected, on_hold, partial, paid, overdue]
+        createdBy:
+          type: string
+        createdByName:
+          type: string
+        hasAttachment:
+          type: boolean
+        overdueDays:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - vendorId
+        - vendorName
+        - description
+        - amount
+        - paidAmount
+        - outstandingBalance
+        - scheduledDate
+        - priority
+        - status
+        - createdBy
+        - createdByName
+        - createdAt
+
+    BillDetail:
+      allOf:
+        - $ref: "#/components/schemas/Bill"
+        - type: object
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: "#/components/schemas/Comment"
+            auditTrail:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditEntry"
+            vendor:
+              $ref: "#/components/schemas/Vendor"
+          required: [comments, auditTrail]
+
+    CreateBillInput:
+      type: object
+      properties:
+        vendorId:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        scheduledDate:
+          type: string
+        dueDate:
+          type: string
+        walletId:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        createdBy:
+          type: string
+        hasAttachment:
+          type: boolean
+      required: [vendorId, description, amount, scheduledDate, priority, createdBy]
+
+    UpdateBillInput:
+      type: object
+      properties:
+        description:
+          type: string
+        amount:
+          type: number
+        scheduledDate:
+          type: string
+        dueDate:
+          type: string
+        walletId:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        totalBilled:
+          type: number
+        totalPaid:
+          type: number
+        outstandingBalance:
+          type: number
+        lastPaymentDate:
+          type: string
+        createdAt:
+          type: string
+      required: [id, name, totalBilled, totalPaid, outstandingBalance, createdAt]
+
+    VendorDetail:
+      allOf:
+        - $ref: "#/components/schemas/Vendor"
+        - type: object
+          properties:
+            bills:
+              type: array
+              items:
+                $ref: "#/components/schemas/Bill"
+            recentActivity:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditEntry"
+          required: [bills, recentActivity]
+
+    CreateVendorInput:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+      required: [name]
+
+    LiabilityAging:
+      type: object
+      properties:
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        totalOutstanding:
+          type: number
+        aging0to7:
+          type: number
+        aging8to14:
+          type: number
+        aging15to30:
+          type: number
+        aging30plus:
+          type: number
+      required: [vendorId, vendorName, totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus]
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        balance:
+          type: number
+        currency:
+          type: string
+        isLow:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, name, balance, currency, createdAt]
+
+    WalletDetail:
+      allOf:
+        - $ref: "#/components/schemas/Wallet"
+        - type: object
+          properties:
+            recentTransactions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Bill"
+          required: [recentTransactions]
+
+    CreateWalletInput:
+      type: object
+      properties:
+        name:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        balance:
+          type: number
+        currency:
+          type: string
+      required: [name, balance, currency]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+          enum:
+            - bill_approved
+            - bill_rejected
+            - bill_partial
+            - bill_held
+            - comment_added
+            - wallet_low
+            - overdue_warning
+            - duplicate_detected
+            - escalated
+        title:
+          type: string
+        body:
+          type: string
+        billId:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, userId, type, title, body, isRead, createdAt]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        billId:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        authorRole:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+      required: [id, billId, authorId, authorName, authorRole, text, createdAt]
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        billId:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        action:
+          type: string
+        details:
+          type: string
+        oldValue:
+          type: string
+        newValue:
+          type: string
+        createdAt:
+          type: string
+      required: [id, userId, userName, action, createdAt]
+
+    DashboardSummary:
+      type: object
+      properties:
+        scheduledTodayCount:
+          type: integer
+        scheduledTodayAmount:
+          type: number
+        scheduledTomorrowCount:
+          type: integer
+        scheduledTomorrowAmount:
+          type: number
+        pendingApprovalCount:
+          type: integer
+        pendingApprovalAmount:
+          type: number
+        approvedUnpaidCount:
+          type: integer
+        approvedUnpaidAmount:
+          type: number
+        totalOutstandingLiabilities:
+          type: number
+        overdueCount:
+          type: integer
+        overdueAmount:
+          type: number
+        totalWalletBalance:
+          type: number
+        paidTodayCount:
+          type: integer
+        paidTodayAmount:
+          type: number
+        partialPaymentsCount:
+          type: integer
+        partialPaymentsAmount:
+          type: number
+        unreadNotificationsCount:
+          type: integer
+      required:
+        - scheduledTodayCount
+        - scheduledTodayAmount
+        - scheduledTomorrowCount
+        - scheduledTomorrowAmount
+        - pendingApprovalCount
+        - pendingApprovalAmount
+        - approvedUnpaidCount
+        - approvedUnpaidAmount
+        - totalOutstandingLiabilities
+        - overdueCount
+        - overdueAmount
+        - totalWalletBalance
+        - paidTodayCount
+        - paidTodayAmount
+        - partialPaymentsCount
+        - partialPaymentsAmount
+        - unreadNotificationsCount
+
+    LiabilitiesReport:
+      type: object
+      properties:
+        totalOutstanding:
+          type: number
+        aging0to7:
+          type: number
+        aging8to14:
+          type: number
+        aging15to30:
+          type: number
+        aging30plus:
+          type: number
+        byVendor:
+          type: array
+          items:
+            $ref: "#/components/schemas/LiabilityAging"
+        byUser:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              userName:
+                type: string
+              total:
+                type: number
+            required: [userId, userName, total]
+      required: [totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser]
