@@ -38,7 +38,7 @@ export default function AlertsScreen() {
 
   const handleNotificationPress = (notification: any) => {
     if (!notification.isRead) {
-      markRead(notification.id, { onSuccess: () => refetch() });
+      markRead({ id: notification.id }, { onSuccess: () => refetch() });
     }
     if (notification.billId) {
       router.push(`/bill/${notification.billId}`);
