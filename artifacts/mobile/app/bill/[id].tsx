@@ -10,10 +10,12 @@ import { PriorityBadge } from '@/components/finance/PriorityBadge';
 import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@/context/AuthContext';
 
 export default function BillDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
+  const { user: authUser } = useAuth();
   const insets = useSafeAreaInsets();
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
 
@@ -53,7 +55,7 @@ export default function BillDetailScreen() {
         await holdMutation.mutateAsync({ id: id as string, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else if (actionId === 'comment') {
-        await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: 'session' } });
+        await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: authUser?.id ?? '' } });
       }
       refetch();
     } catch (error) {

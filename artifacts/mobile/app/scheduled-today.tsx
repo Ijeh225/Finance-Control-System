@@ -4,6 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { useGetScheduledToday, getGetScheduledTodayQueryKey, useApproveBill, useRejectBill, useHoldBill, useAddBillComment } from '@workspace/api-client-react';
 import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthContext';
 import { BillCard } from '@/components/finance/BillCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
@@ -13,6 +14,7 @@ export default function ScheduledTodayScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { userId } = useUser();
+  const { user: authUser } = useAuth();
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useGetScheduledToday(
@@ -46,7 +48,7 @@ export default function ScheduledTodayScreen() {
         await holdMutation.mutateAsync({ id: selectedBillId, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else if (actionId === 'comment') {
-        await commentMutation.mutateAsync({ id: selectedBillId, data: { text: comment, authorId: 'session' } });
+        await commentMutation.mutateAsync({ id: selectedBillId, data: { text: comment, authorId: authUser?.id ?? '' } });
       }
       refetch();
     } catch (error) {
