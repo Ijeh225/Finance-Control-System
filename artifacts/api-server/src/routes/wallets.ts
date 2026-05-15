@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
-import { db, walletsTable, billsTable, usersTable, walletTransactionsTable, auditTable } from "@workspace/db";
+import { eq, desc, sql, or } from "drizzle-orm";
+import { db, walletsTable, usersTable, walletTransactionsTable, auditTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -47,7 +47,7 @@ router.get("/wallets", async (req, res): Promise<void> => {
   res.json({ wallets: wallets.map(w => fmtWallet(w, w.ownedBy ? ownerMap[w.ownedBy] : undefined)) });
 });
 
-// POST /wallets — create wallet
+// POST /wallets — create wallet (MD only or self)
 router.post("/wallets", async (req, res): Promise<void> => {
   const actor = req.user!;
   const { name, bankName, accountNumber, balance, currency, ownedBy: bodyOwnedBy } = req.body;
@@ -75,10 +75,13 @@ router.post("/wallets", async (req, res): Promise<void> => {
 });
 
 // POST /wallets/transfer — atomic transfer between wallets
+// Uses SELECT … FOR UPDATE (ordered by id to prevent deadlock) so concurrent
+// transfers against the same wallets serialise correctly and cannot overdraw.
 router.post("/wallets/transfer", async (req, res): Promise<void> => {
   const actor = req.user!;
   const { fromWalletId, toWalletId, amount, narration } = req.body;
 
+  // Pure input validation — no DB reads yet
   if (!fromWalletId || !toWalletId || amount === undefined || !narration) {
     res.status(400).json({ error: "fromWalletId, toWalletId, amount, and narration are required" });
     return;
@@ -87,37 +90,48 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Source and destination wallets must be different" });
     return;
   }
-
   const transferAmount = parseFloat(String(amount));
   if (isNaN(transferAmount) || transferAmount <= 0) {
     res.status(400).json({ error: "Amount must be a positive number" });
     return;
   }
 
-  const [fromWallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, fromWalletId));
-  const [toWallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, toWalletId));
+  // Discriminated result from the transaction
+  type TxResult =
+    | { ok: true; from: typeof walletsTable.$inferSelect; to: typeof walletsTable.$inferSelect; debitTx: typeof walletTransactionsTable.$inferSelect; creditTx: typeof walletTransactionsTable.$inferSelect }
+    | { ok: false; status: number; error: string };
 
-  if (!fromWallet) { res.status(404).json({ error: "Source wallet not found" }); return; }
-  if (!toWallet) { res.status(404).json({ error: "Destination wallet not found" }); return; }
+  const result: TxResult = await db.transaction(async (tx) => {
+    // Lock both rows with consistent ordering to prevent deadlocks
+    const [first, second] = [fromWalletId, toWalletId].sort();
+    const locked = await tx.execute<{ id: string; balance: string; ownedBy: string | null; name: string }>(
+      sql`SELECT id, balance, "ownedBy", name FROM wallets WHERE id = ${first} OR id = ${second} ORDER BY id FOR UPDATE`
+    );
 
-  // Non-MD can only transfer from their own wallet
-  if (actor.role !== "md" && fromWallet.ownedBy !== actor.id) {
-    res.status(403).json({ error: "You can only transfer from your own wallet" });
-    return;
-  }
+    const fromWallet = locked.rows.find(r => r.id === fromWalletId);
+    const toWallet   = locked.rows.find(r => r.id === toWalletId);
 
-  const fromBalance = parseFloat(String(fromWallet.balance));
-  const toBalance = parseFloat(String(toWallet.balance));
+    if (!fromWallet) return { ok: false, status: 404, error: "Source wallet not found" };
+    if (!toWallet)   return { ok: false, status: 404, error: "Destination wallet not found" };
 
-  if (fromBalance < transferAmount) {
-    res.status(400).json({ error: `Insufficient balance. Available: ₦${fromBalance.toLocaleString("en-NG")}, Requested: ₦${transferAmount.toLocaleString("en-NG")}` });
-    return;
-  }
+    if (actor.role !== "md" && fromWallet.ownedBy !== actor.id) {
+      return { ok: false, status: 403, error: "You can only transfer from your own wallet" };
+    }
 
-  const newFromBalance = fromBalance - transferAmount;
-  const newToBalance = toBalance + transferAmount;
+    const fromBalance = parseFloat(fromWallet.balance);
+    const toBalance   = parseFloat(toWallet.balance);
 
-  const result = await db.transaction(async (tx) => {
+    if (fromBalance < transferAmount) {
+      return {
+        ok: false,
+        status: 400,
+        error: `Insufficient balance. Available: ₦${fromBalance.toLocaleString("en-NG")}, Requested: ₦${transferAmount.toLocaleString("en-NG")}`,
+      };
+    }
+
+    const newFromBalance = fromBalance - transferAmount;
+    const newToBalance   = toBalance + transferAmount;
+
     const [updatedFrom] = await tx.update(walletsTable)
       .set({ balance: String(newFromBalance) })
       .where(eq(walletsTable.id, fromWalletId))
@@ -156,20 +170,26 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
       relatedWalletName: fromWallet.name,
     }).returning();
 
-    return { updatedFrom, updatedTo, debitTx, creditTx };
+    return { ok: true, from: updatedFrom, to: updatedTo, debitTx, creditTx };
   });
 
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+
+  // Audit outside the transaction (best-effort; not worth aborting the transfer)
   await db.insert(auditTable).values({
     id: uid(),
     userId: actor.id,
     userName: actor.name,
     action: "transfer",
-    details: `₦${transferAmount.toLocaleString("en-NG")} from ${fromWallet.name} → ${toWallet.name}: ${narration}`,
-  });
+    details: `₦${transferAmount.toLocaleString("en-NG")} from ${result.from.name} → ${result.to.name}: ${narration}`,
+  }).catch(() => undefined);
 
   res.json({
-    from: fmtWallet(result.updatedFrom),
-    to: fmtWallet(result.updatedTo),
+    from: fmtWallet(result.from),
+    to: fmtWallet(result.to),
     debitTx: fmtTx(result.debitTx),
     creditTx: fmtTx(result.creditTx),
   });
@@ -248,13 +268,13 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
   });
 });
 
-// PATCH /wallets/:id — update wallet
+// PATCH /wallets/:id — update wallet; records a ledger entry if balance changes
 router.patch("/wallets/:id", async (req, res): Promise<void> => {
   const actor = req.user!;
   const id = req.params["id"] as string;
   const { balance, name, bankName, accountNumber, currency, ownedBy } = req.body;
 
-  const [existing] = await db.select({ ownedBy: walletsTable.ownedBy }).from(walletsTable).where(eq(walletsTable.id, id));
+  const [existing] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Wallet not found" }); return; }
 
   if (actor.role !== "md" && existing.ownedBy !== actor.id) {
@@ -277,6 +297,28 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
 
   const [wallet] = await db.update(walletsTable).set(updates).where(eq(walletsTable.id, id)).returning();
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+
+  // Record a ledger entry when the balance is manually adjusted
+  if (balance !== undefined) {
+    const prevBalance = parseFloat(String(existing.balance ?? 0));
+    const newBalance  = parseFloat(String(balance));
+    const diff = newBalance - prevBalance;
+    if (diff !== 0) {
+      await db.insert(walletTransactionsTable).values({
+        id: uid(),
+        walletId: id,
+        type: diff > 0 ? "credit" : "debit",
+        amount: String(Math.abs(diff)),
+        balanceBefore: String(prevBalance),
+        balanceAfter: String(newBalance),
+        narration: "Manual balance adjustment",
+        initiatedBy: actor.id,
+        initiatedByName: actor.name,
+        relatedWalletId: null,
+        relatedWalletName: null,
+      }).catch(() => undefined);
+    }
+  }
 
   let ownerName: string | undefined;
   if (wallet.ownedBy) {
