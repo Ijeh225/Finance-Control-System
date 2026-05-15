@@ -1451,8 +1451,10 @@ components:
           type: string
         relatedWalletId:
           type: string
+          nullable: true
         relatedWalletName:
           type: string
+          nullable: true
         createdAt:
           type: string
       required: [id, walletId, type, amount, balanceBefore, balanceAfter, narration, initiatedBy, initiatedByName, createdAt]

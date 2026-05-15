@@ -938,8 +938,8 @@ export const GetWalletResponse = zod.object({
   "narration": zod.string(),
   "initiatedBy": zod.string(),
   "initiatedByName": zod.string(),
-  "relatedWalletId": zod.string().optional(),
-  "relatedWalletName": zod.string().optional(),
+  "relatedWalletId": zod.string().nullish(),
+  "relatedWalletName": zod.string().nullish(),
   "createdAt": zod.string()
 }))
 }))
@@ -1016,8 +1016,8 @@ export const TransferFundsResponse = zod.object({
   "narration": zod.string(),
   "initiatedBy": zod.string(),
   "initiatedByName": zod.string(),
-  "relatedWalletId": zod.string().optional(),
-  "relatedWalletName": zod.string().optional(),
+  "relatedWalletId": zod.string().nullish(),
+  "relatedWalletName": zod.string().nullish(),
   "createdAt": zod.string()
 }),
   "creditTx": zod.object({
@@ -1030,8 +1030,8 @@ export const TransferFundsResponse = zod.object({
   "narration": zod.string(),
   "initiatedBy": zod.string(),
   "initiatedByName": zod.string(),
-  "relatedWalletId": zod.string().optional(),
-  "relatedWalletName": zod.string().optional(),
+  "relatedWalletId": zod.string().nullish(),
+  "relatedWalletName": zod.string().nullish(),
   "createdAt": zod.string()
 })
 })
@@ -1075,8 +1075,8 @@ export const GetWalletStatementResponse = zod.object({
   "narration": zod.string(),
   "initiatedBy": zod.string(),
   "initiatedByName": zod.string(),
-  "relatedWalletId": zod.string().optional(),
-  "relatedWalletName": zod.string().optional(),
+  "relatedWalletId": zod.string().nullish(),
+  "relatedWalletName": zod.string().nullish(),
   "createdAt": zod.string()
 })),
   "total": zod.number(),

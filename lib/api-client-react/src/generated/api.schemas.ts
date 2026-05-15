@@ -273,8 +273,8 @@ export interface WalletTransaction {
   narration: string;
   initiatedBy: string;
   initiatedByName: string;
-  relatedWalletId?: string;
-  relatedWalletName?: string;
+  relatedWalletId?: string | null;
+  relatedWalletName?: string | null;
   createdAt: string;
 }
 
