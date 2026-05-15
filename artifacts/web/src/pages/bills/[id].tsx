@@ -659,8 +659,8 @@ export default function BillDetail() {
                   description: editForm.description,
                   amount: Number(editForm.amount),
                   scheduledDate: editForm.scheduledDate,
-                  dueDate: editForm.dueDate || undefined,
-                  walletId: editForm.walletId || undefined,
+                  dueDate: editForm.dueDate,
+                  walletId: editForm.walletId,
                   priority: editForm.priority,
                 },
               })}
