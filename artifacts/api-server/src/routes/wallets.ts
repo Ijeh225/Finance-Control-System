@@ -104,8 +104,8 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
   const result: TxResult = await db.transaction(async (tx) => {
     // Lock both rows with consistent ordering to prevent deadlocks
     const [first, second] = [fromWalletId, toWalletId].sort();
-    const locked = await tx.execute<{ id: string; balance: string; ownedBy: string | null; name: string }>(
-      sql`SELECT id, balance, owned_by AS "ownedBy", name FROM wallets WHERE id = ${first} OR id = ${second} ORDER BY id FOR UPDATE`
+    const locked = await tx.execute<{ id: string; balance: string; ownedBy: string | null; name: string; currency: string | null }>(
+      sql`SELECT id, balance, owned_by AS "ownedBy", name, currency FROM wallets WHERE id = ${first} OR id = ${second} ORDER BY id FOR UPDATE`
     );
 
     const fromWallet = locked.rows.find(r => r.id === fromWalletId);
@@ -122,6 +122,17 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     // Prevents leaking metadata of unrelated wallets via the transfer response.
     if (actor.role !== "md" && toWallet.ownedBy !== actor.id) {
       return { ok: false, status: 403, error: "You can only transfer to your own wallet" };
+    }
+
+    // Currency guard: block cross-currency transfers without a conversion policy
+    const fromCurrency = fromWallet.currency ?? "NGN";
+    const toCurrency   = toWallet.currency ?? "NGN";
+    if (fromCurrency !== toCurrency) {
+      return {
+        ok: false,
+        status: 400,
+        error: `Cannot transfer between different currencies (${fromCurrency} → ${toCurrency}). Both wallets must use the same currency.`,
+      };
     }
 
     const fromBalance = parseFloat(fromWallet.balance);
