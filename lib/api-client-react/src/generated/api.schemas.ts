@@ -641,3 +641,40 @@ export type GetPartialPayments200 = {
   total: number;
 };
 
+export type ExportReportParams = {
+format?: ExportReportFormat;
+userId?: string;
+};
+
+export type ExportReportFormat = typeof ExportReportFormat[keyof typeof ExportReportFormat];
+
+
+export const ExportReportFormat = {
+  excel: 'excel',
+  pdf: 'pdf',
+} as const;
+
+export type ExportVendorStatementParams = {
+format?: ExportVendorStatementFormat;
+};
+
+export type ExportVendorStatementFormat = typeof ExportVendorStatementFormat[keyof typeof ExportVendorStatementFormat];
+
+
+export const ExportVendorStatementFormat = {
+  excel: 'excel',
+  pdf: 'pdf',
+} as const;
+
+export type ExportWalletStatementParams = {
+format?: ExportWalletStatementFormat;
+};
+
+export type ExportWalletStatementFormat = typeof ExportWalletStatementFormat[keyof typeof ExportWalletStatementFormat];
+
+
+export const ExportWalletStatementFormat = {
+  excel: 'excel',
+  pdf: 'pdf',
+} as const;
+

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import multer from "multer";
 import { eq, and } from "drizzle-orm";
 import { db, billAttachmentsTable, billsTable } from "@workspace/db";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
@@ -6,6 +7,11 @@ import { Readable } from "stream";
 
 const router: IRouter = Router();
 const storageService = new ObjectStorageService();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -26,6 +32,82 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
+
+/**
+ * POST /bills/:id/attachments
+ * Multipart upload: receive the file, store it in object storage, and
+ * record the attachment as confirmed in one step.
+ */
+router.post("/bills/:id/attachments", upload.single("file"), async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const billId = req.params["id"] as string;
+  const file = req.file;
+
+  if (!file) {
+    res.status(400).json({ error: "No file provided. Send the file as multipart field 'file'." });
+    return;
+  }
+
+  const mimeType = file.mimetype || "application/octet-stream";
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    res.status(400).json({ error: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV." });
+    return;
+  }
+
+  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
+  if (!bill) {
+    res.status(404).json({ error: "Bill not found" });
+    return;
+  }
+  if (actor.role !== "md" && bill.createdBy !== actor.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  try {
+    const uploadUrl = await storageService.getObjectEntityUploadURL();
+    const objectPath = storageService.normalizeObjectEntityPath(uploadUrl);
+
+    const putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": mimeType },
+      body: file.buffer,
+    });
+    if (!putRes.ok) {
+      req.log.error({ status: putRes.status }, "Storage PUT failed during multipart upload");
+      res.status(502).json({ error: "Failed to store file" });
+      return;
+    }
+
+    const attachmentId = uid();
+    await db.insert(billAttachmentsTable).values({
+      id: attachmentId,
+      billId,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType,
+      storedKey: objectPath,
+      confirmed: true,
+      uploadedBy: actor.id,
+      uploadedByName: actor.name,
+    });
+
+    await db.update(billsTable).set({ hasAttachment: true }).where(eq(billsTable.id, billId));
+
+    res.status(201).json({
+      id: attachmentId,
+      billId,
+      fileName: file.originalname,
+      fileSize: file.size,
+      mimeType,
+      uploadedBy: actor.id,
+      uploadedByName: actor.name,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to upload bill attachment (multipart)");
+    res.status(500).json({ error: "Failed to upload attachment" });
+  }
+});
 
 /**
  * POST /bills/:id/attachments/request-upload

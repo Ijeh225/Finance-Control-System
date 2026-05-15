@@ -34,6 +34,9 @@ import type {
   DeactivateUser200,
   DeleteBillAttachment200,
   EscalateBillBody,
+  ExportReportParams,
+  ExportVendorStatementParams,
+  ExportWalletStatementParams,
   GetBillAudit200,
   GetBillComments200,
   GetDashboardSummaryParams,
@@ -3785,6 +3788,273 @@ export function useGetPartialPayments<TData = Awaited<ReturnType<typeof getParti
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPartialPaymentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportReportUrl = (type: 'outstanding-liabilities' | 'pending-approvals' | 'paid-today' | 'partial-payments',
+    params?: ExportReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/export/reports/${type}?${stringifiedParams}` : `/api/export/reports/${type}`
+}
+
+/**
+ * @summary Export a report as Excel or PDF
+ */
+export const exportReport = async (type: 'outstanding-liabilities' | 'pending-approvals' | 'paid-today' | 'partial-payments',
+    params?: ExportReportParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportReportUrl(type,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportReportQueryKey = (type: 'outstanding-liabilities' | 'pending-approvals' | 'paid-today' | 'partial-payments',
+    params?: ExportReportParams,) => {
+    return [
+    `/api/export/reports/${type}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportReportQueryOptions = <TData = Awaited<ReturnType<typeof exportReport>>, TError = ErrorType<unknown>>(type: 'outstanding-liabilities' | 'pending-approvals' | 'paid-today' | 'partial-payments',
+    params?: ExportReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportReportQueryKey(type,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportReport>>> = ({ signal }) => exportReport(type,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(type), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportReportQueryResult = NonNullable<Awaited<ReturnType<typeof exportReport>>>
+export type ExportReportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export a report as Excel or PDF
+ */
+
+export function useExportReport<TData = Awaited<ReturnType<typeof exportReport>>, TError = ErrorType<unknown>>(
+ type: 'outstanding-liabilities' | 'pending-approvals' | 'paid-today' | 'partial-payments',
+    params?: ExportReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportReportQueryOptions(type,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportVendorStatementUrl = (id: string,
+    params?: ExportVendorStatementParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/export/vendors/${id}/statement?${stringifiedParams}` : `/api/export/vendors/${id}/statement`
+}
+
+/**
+ * @summary Export a vendor payment statement as Excel or PDF
+ */
+export const exportVendorStatement = async (id: string,
+    params?: ExportVendorStatementParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportVendorStatementUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportVendorStatementQueryKey = (id: string,
+    params?: ExportVendorStatementParams,) => {
+    return [
+    `/api/export/vendors/${id}/statement`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportVendorStatementQueryOptions = <TData = Awaited<ReturnType<typeof exportVendorStatement>>, TError = ErrorType<unknown>>(id: string,
+    params?: ExportVendorStatementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVendorStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportVendorStatementQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportVendorStatement>>> = ({ signal }) => exportVendorStatement(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportVendorStatement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportVendorStatementQueryResult = NonNullable<Awaited<ReturnType<typeof exportVendorStatement>>>
+export type ExportVendorStatementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export a vendor payment statement as Excel or PDF
+ */
+
+export function useExportVendorStatement<TData = Awaited<ReturnType<typeof exportVendorStatement>>, TError = ErrorType<unknown>>(
+ id: string,
+    params?: ExportVendorStatementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportVendorStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportVendorStatementQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getExportWalletStatementUrl = (id: string,
+    params?: ExportWalletStatementParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/export/wallets/${id}/statement?${stringifiedParams}` : `/api/export/wallets/${id}/statement`
+}
+
+/**
+ * @summary Export a wallet transaction statement as Excel or PDF
+ */
+export const exportWalletStatement = async (id: string,
+    params?: ExportWalletStatementParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getExportWalletStatementUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getExportWalletStatementQueryKey = (id: string,
+    params?: ExportWalletStatementParams,) => {
+    return [
+    `/api/export/wallets/${id}/statement`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getExportWalletStatementQueryOptions = <TData = Awaited<ReturnType<typeof exportWalletStatement>>, TError = ErrorType<unknown>>(id: string,
+    params?: ExportWalletStatementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportWalletStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getExportWalletStatementQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof exportWalletStatement>>> = ({ signal }) => exportWalletStatement(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof exportWalletStatement>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ExportWalletStatementQueryResult = NonNullable<Awaited<ReturnType<typeof exportWalletStatement>>>
+export type ExportWalletStatementQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Export a wallet transaction statement as Excel or PDF
+ */
+
+export function useExportWalletStatement<TData = Awaited<ReturnType<typeof exportWalletStatement>>, TError = ErrorType<unknown>>(
+ id: string,
+    params?: ExportWalletStatementParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof exportWalletStatement>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getExportWalletStatementQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

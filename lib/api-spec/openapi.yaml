@@ -1221,6 +1221,101 @@ paths:
                     type: number
                 required: [bills, total]
 
+  /export/reports/{type}:
+    get:
+      operationId: exportReport
+      tags: [reports]
+      summary: Export a report as Excel or PDF
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [outstanding-liabilities, pending-approvals, paid-today, partial-payments]
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [excel, pdf]
+            default: excel
+        - name: userId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Report file (Excel or PDF)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /export/vendors/{id}/statement:
+    get:
+      operationId: exportVendorStatement
+      tags: [vendors]
+      summary: Export a vendor payment statement as Excel or PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [excel, pdf]
+            default: excel
+      responses:
+        "200":
+          description: Vendor statement file (Excel or PDF)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /export/wallets/{id}/statement:
+    get:
+      operationId: exportWalletStatement
+      tags: [wallets]
+      summary: Export a wallet transaction statement as Excel or PDF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [excel, pdf]
+            default: excel
+      responses:
+        "200":
+          description: Wallet statement file (Excel or PDF)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
 components:
   schemas:
     HealthStatus:

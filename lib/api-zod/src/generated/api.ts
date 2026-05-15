@@ -1377,3 +1377,46 @@ export const GetPartialPaymentsResponse = zod.object({
 })
 
 
+/**
+ * @summary Export a report as Excel or PDF
+ */
+export const ExportReportParams = zod.object({
+  "type": zod.enum(['outstanding-liabilities', 'pending-approvals', 'paid-today', 'partial-payments'])
+})
+
+export const exportReportQueryFormatDefault = `excel`;
+
+export const ExportReportQueryParams = zod.object({
+  "format": zod.enum(['excel', 'pdf']).default(exportReportQueryFormatDefault),
+  "userId": zod.coerce.string().optional()
+})
+
+
+/**
+ * @summary Export a vendor payment statement as Excel or PDF
+ */
+export const ExportVendorStatementParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const exportVendorStatementQueryFormatDefault = `excel`;
+
+export const ExportVendorStatementQueryParams = zod.object({
+  "format": zod.enum(['excel', 'pdf']).default(exportVendorStatementQueryFormatDefault)
+})
+
+
+/**
+ * @summary Export a wallet transaction statement as Excel or PDF
+ */
+export const ExportWalletStatementParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const exportWalletStatementQueryFormatDefault = `excel`;
+
+export const ExportWalletStatementQueryParams = zod.object({
+  "format": zod.enum(['excel', 'pdf']).default(exportWalletStatementQueryFormatDefault)
+})
+
+
