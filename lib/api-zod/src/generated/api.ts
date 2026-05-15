@@ -930,25 +930,17 @@ export const GetWalletResponse = zod.object({
 }).and(zod.object({
   "recentTransactions": zod.array(zod.object({
   "id": zod.string(),
-  "vendorId": zod.string(),
-  "vendorName": zod.string(),
-  "description": zod.string(),
+  "walletId": zod.string(),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
   "amount": zod.number(),
-  "approvedAmount": zod.number().optional(),
-  "paidAmount": zod.number(),
-  "outstandingBalance": zod.number(),
-  "scheduledDate": zod.string(),
-  "dueDate": zod.string().optional(),
-  "walletId": zod.string().optional(),
-  "walletName": zod.string().optional(),
-  "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
-  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']),
-  "createdBy": zod.string(),
-  "createdByName": zod.string(),
-  "hasAttachment": zod.boolean().optional(),
-  "overdueDays": zod.number().optional(),
-  "createdAt": zod.string(),
-  "updatedAt": zod.string().optional()
+  "balanceBefore": zod.number(),
+  "balanceAfter": zod.number(),
+  "narration": zod.string(),
+  "initiatedBy": zod.string(),
+  "initiatedByName": zod.string(),
+  "relatedWalletId": zod.string().optional(),
+  "relatedWalletName": zod.string().optional(),
+  "createdAt": zod.string()
 }))
 }))
 
@@ -976,6 +968,120 @@ export const UpdateWalletResponse = zod.object({
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Transfer funds between wallets
+ */
+export const TransferFundsBody = zod.object({
+  "fromWalletId": zod.string(),
+  "toWalletId": zod.string(),
+  "amount": zod.number(),
+  "narration": zod.string()
+})
+
+export const TransferFundsResponse = zod.object({
+  "from": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "balance": zod.number(),
+  "currency": zod.string(),
+  "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
+  "createdAt": zod.string()
+}),
+  "to": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "balance": zod.number(),
+  "currency": zod.string(),
+  "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
+  "createdAt": zod.string()
+}),
+  "debitTx": zod.object({
+  "id": zod.string(),
+  "walletId": zod.string(),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "amount": zod.number(),
+  "balanceBefore": zod.number(),
+  "balanceAfter": zod.number(),
+  "narration": zod.string(),
+  "initiatedBy": zod.string(),
+  "initiatedByName": zod.string(),
+  "relatedWalletId": zod.string().optional(),
+  "relatedWalletName": zod.string().optional(),
+  "createdAt": zod.string()
+}),
+  "creditTx": zod.object({
+  "id": zod.string(),
+  "walletId": zod.string(),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "amount": zod.number(),
+  "balanceBefore": zod.number(),
+  "balanceAfter": zod.number(),
+  "narration": zod.string(),
+  "initiatedBy": zod.string(),
+  "initiatedByName": zod.string(),
+  "relatedWalletId": zod.string().optional(),
+  "relatedWalletName": zod.string().optional(),
+  "createdAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Get wallet transaction statement
+ */
+export const GetWalletStatementParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const getWalletStatementQueryPageDefault = 1;
+export const getWalletStatementQueryPageSizeDefault = 50;
+
+export const GetWalletStatementQueryParams = zod.object({
+  "page": zod.coerce.number().default(getWalletStatementQueryPageDefault),
+  "pageSize": zod.coerce.number().default(getWalletStatementQueryPageSizeDefault)
+})
+
+export const GetWalletStatementResponse = zod.object({
+  "wallet": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "balance": zod.number(),
+  "currency": zod.string(),
+  "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
+  "createdAt": zod.string()
+}),
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "walletId": zod.string(),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "amount": zod.number(),
+  "balanceBefore": zod.number(),
+  "balanceAfter": zod.number(),
+  "narration": zod.string(),
+  "initiatedBy": zod.string(),
+  "initiatedByName": zod.string(),
+  "relatedWalletId": zod.string().optional(),
+  "relatedWalletName": zod.string().optional(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
 })
 
 

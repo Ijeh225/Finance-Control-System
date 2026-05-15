@@ -814,6 +814,64 @@ paths:
               schema:
                 $ref: "#/components/schemas/Wallet"
 
+  /wallets/transfer:
+    post:
+      operationId: transferFunds
+      tags: [wallets]
+      summary: Transfer funds between wallets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferInput"
+      responses:
+        "200":
+          description: Transfer result with updated wallet balances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from:
+                    $ref: "#/components/schemas/Wallet"
+                  to:
+                    $ref: "#/components/schemas/Wallet"
+                  debitTx:
+                    $ref: "#/components/schemas/WalletTransaction"
+                  creditTx:
+                    $ref: "#/components/schemas/WalletTransaction"
+                required: [from, to, debitTx, creditTx]
+
+  /wallets/{id}/statement:
+    get:
+      operationId: getWalletStatement
+      tags: [wallets]
+      summary: Get wallet transaction statement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Wallet statement with transaction history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletStatement"
+
   # ─── NOTIFICATIONS ───────────────────────────────────────────
   /notifications:
     get:
@@ -1369,6 +1427,36 @@ components:
           type: string
       required: [id, name, balance, currency, createdAt]
 
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        walletId:
+          type: string
+        type:
+          type: string
+          enum: [credit, debit, transfer_in, transfer_out]
+        amount:
+          type: number
+        balanceBefore:
+          type: number
+        balanceAfter:
+          type: number
+        narration:
+          type: string
+        initiatedBy:
+          type: string
+        initiatedByName:
+          type: string
+        relatedWalletId:
+          type: string
+        relatedWalletName:
+          type: string
+        createdAt:
+          type: string
+      required: [id, walletId, type, amount, balanceBefore, balanceAfter, narration, initiatedBy, initiatedByName, createdAt]
+
     WalletDetail:
       allOf:
         - $ref: "#/components/schemas/Wallet"
@@ -1377,8 +1465,38 @@ components:
             recentTransactions:
               type: array
               items:
-                $ref: "#/components/schemas/Bill"
+                $ref: "#/components/schemas/WalletTransaction"
           required: [recentTransactions]
+
+    WalletStatement:
+      type: object
+      properties:
+        wallet:
+          $ref: "#/components/schemas/Wallet"
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletTransaction"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required: [wallet, transactions, total, page, pageSize]
+
+    TransferInput:
+      type: object
+      properties:
+        fromWalletId:
+          type: string
+        toWalletId:
+          type: string
+        amount:
+          type: number
+        narration:
+          type: string
+      required: [fromWalletId, toWalletId, amount, narration]
 
     CreateWalletInput:
       type: object

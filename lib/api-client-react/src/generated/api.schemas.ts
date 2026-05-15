@@ -253,9 +253,49 @@ export interface LiabilityAging {
   aging30plus: number;
 }
 
+export type WalletTransactionType = typeof WalletTransactionType[keyof typeof WalletTransactionType];
+
+
+export const WalletTransactionType = {
+  credit: 'credit',
+  debit: 'debit',
+  transfer_in: 'transfer_in',
+  transfer_out: 'transfer_out',
+} as const;
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  type: WalletTransactionType;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  narration: string;
+  initiatedBy: string;
+  initiatedByName: string;
+  relatedWalletId?: string;
+  relatedWalletName?: string;
+  createdAt: string;
+}
+
 export type WalletDetail = Wallet & {
-  recentTransactions: Bill[];
+  recentTransactions: WalletTransaction[];
 };
+
+export interface WalletStatement {
+  wallet: Wallet;
+  transactions: WalletTransaction[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface TransferInput {
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  narration: string;
+}
 
 export interface CreateWalletInput {
   name: string;
@@ -487,6 +527,18 @@ export type ListWallets200 = {
 export type UpdateWalletBody = {
   balance?: number;
   name?: string;
+};
+
+export type TransferFunds200 = {
+  from: Wallet;
+  to: Wallet;
+  debitTx: WalletTransaction;
+  creditTx: WalletTransaction;
+};
+
+export type GetWalletStatementParams = {
+page?: number;
+pageSize?: number;
 };
 
 export type ListNotificationsParams = {

@@ -14,6 +14,7 @@ import BillDetail from "@/pages/bills/[id]";
 import Vendors from "@/pages/vendors/index";
 import VendorDetail from "@/pages/vendors/[id]";
 import Wallets from "@/pages/wallets/index";
+import WalletDetail from "@/pages/wallets/[id]";
 import Notifications from "@/pages/notifications/index";
 import Reports from "@/pages/reports/index";
 import Audit from "@/pages/audit/index";
@@ -59,6 +60,7 @@ function AppRoutes() {
       <Route path="/vendors" component={() => <ProtectedRoute component={Vendors} />} />
       <Route path="/vendors/:id" component={() => <ProtectedRoute component={VendorDetail} />} />
       <Route path="/wallets" component={() => <ProtectedRoute component={Wallets} />} />
+      <Route path="/wallets/:id" component={() => <ProtectedRoute component={WalletDetail} />} />
       <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
       <Route path="/users" component={() => <ProtectedRoute component={UsersList} />} />

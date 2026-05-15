@@ -3,9 +3,39 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform } from 'r
 import { useColors } from '@/hooks/useColors';
 import { useLocalSearchParams } from 'expo-router';
 import { useGetWallet, getGetWalletQueryKey } from '@workspace/api-client-react';
+import type { WalletTransaction } from '@workspace/api-client-react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText } from '@/components/finance/AmountText';
-import { BillCard } from '@/components/finance/BillCard';
+
+const TX_LABELS: Record<string, string> = {
+  credit: 'Credit',
+  debit: 'Debit',
+  transfer_in: 'Transfer In',
+  transfer_out: 'Transfer Out',
+};
+
+function TransactionRow({ tx }: { tx: WalletTransaction }) {
+  const colors = useColors();
+  const isCredit = tx.type === 'credit' || tx.type === 'transfer_in';
+  return (
+    <View style={[styles.txRow, { borderBottomColor: colors.border }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.txNarration, { color: colors.foreground }]} numberOfLines={1}>{tx.narration}</Text>
+        <Text style={[styles.txMeta, { color: colors.mutedForeground }]}>
+          {TX_LABELS[tx.type] ?? tx.type}
+          {tx.relatedWalletName ? ` · ${tx.relatedWalletName}` : ''}
+        </Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={[styles.txAmount, { color: isCredit ? colors.primary : colors.destructive }]}>
+          {isCredit ? '+' : '-'}
+        </Text>
+        <AmountText amount={tx.amount} style={[styles.txAmount, { color: isCredit ? colors.primary : colors.destructive }]} />
+        <AmountText amount={tx.balanceAfter} style={[styles.txBalance, { color: colors.mutedForeground }]} />
+      </View>
+    </View>
+  );
+}
 
 export default function WalletDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,9 +66,9 @@ export default function WalletDetailScreen() {
               <Text style={[styles.bankLabel, { color: colors.primaryForeground }]}>
                 {wallet.bankName} • {wallet.name}
               </Text>
-              <AmountText 
-                amount={wallet.balance} 
-                style={[styles.balanceAmount, { color: colors.primaryForeground }]} 
+              <AmountText
+                amount={wallet.balance}
+                style={[styles.balanceAmount, { color: colors.primaryForeground }]}
               />
               <Text style={[styles.accountNumber, { color: colors.primaryForeground }]}>
                 {wallet.accountNumber}
@@ -47,7 +77,7 @@ export default function WalletDetailScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
           </View>
         }
-        renderItem={({ item }) => <BillCard bill={item} />}
+        renderItem={({ item }) => <TransactionRow tx={item} />}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom + 20 }
@@ -100,5 +130,31 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 40,
+  },
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  txNarration: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  txMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  txAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  txBalance: {
+    fontSize: 11,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
 });
