@@ -352,6 +352,29 @@ export interface DashboardSummary {
   unreadNotificationsCount: number;
 }
 
+export interface BillAttachment {
+  id: string;
+  billId: string;
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+  uploadedBy: string;
+  uploadedByName: string;
+  uploadedAt: string;
+}
+
+export interface RequestAttachmentUploadInput {
+  fileName: string;
+  fileSize?: number;
+  mimeType?: string;
+}
+
+export interface RequestAttachmentUploadResponse {
+  attachmentId: string;
+  uploadUrl: string;
+  objectPath: string;
+}
+
 export type LiabilitiesReportByUserItem = {
   userId: string;
   userName: string;
@@ -493,6 +516,18 @@ export type PartialApproveBillBody = {
 
 export type EscalateBillBody = {
   comment?: string;
+};
+
+export type ConfirmBillAttachment200 = {
+  ok: boolean;
+};
+
+export type ListBillAttachments200 = {
+  attachments: BillAttachment[];
+};
+
+export type DeleteBillAttachment200 = {
+  ok: boolean;
 };
 
 export type GetBillComments200 = {

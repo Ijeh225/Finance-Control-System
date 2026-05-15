@@ -6,14 +6,13 @@ import {
   useListWallets, getListWalletsQueryKey,
   useTransferFunds,
 } from "@workspace/api-client-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -23,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ArrowRightLeft, ArrowDownRight, ArrowUpRight,
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
-  Building2, Hash,
+  Building2, Hash, Download,
 } from "lucide-react";
 
 const TX_TYPE_CONFIG: Record<string, { label: string; color: string; sign: string }> = {
@@ -141,9 +140,21 @@ export default function WalletDetail() {
             )}
           </div>
         </div>
-        <Button onClick={() => { setTransferForm(f => ({ ...f, fromWalletId: id ?? "" })); setShowTransfer(true); }}>
-          <ArrowRightLeft className="w-4 h-4 mr-2" /> Transfer Funds
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button onClick={() => { setTransferForm(f => ({ ...f, fromWalletId: id ?? "" })); setShowTransfer(true); }}>
+            <ArrowRightLeft className="w-4 h-4 mr-2" /> Transfer Funds
+          </Button>
+          <a href={`/api/export/wallets/${id}/statement?format=excel`} download data-testid="button-export-wallet-excel">
+            <Button variant="outline" size="sm" className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Excel
+            </Button>
+          </a>
+          <a href={`/api/export/wallets/${id}/statement?format=pdf`} download data-testid="button-export-wallet-pdf">
+            <Button variant="outline" size="sm" className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> PDF
+            </Button>
+          </a>
+        </div>
       </div>
 
       {/* Balance Card */}
@@ -187,28 +198,30 @@ export default function WalletDetail() {
 
             <div className="divide-y">
               {transactions.map((tx) => {
-                const cfg = TX_TYPE_CONFIG[tx.type] ?? TX_TYPE_CONFIG["credit"];
-                const isCredit = tx.type === "credit" || tx.type === "transfer_in";
+                const cfg = TX_TYPE_CONFIG[tx.type ?? "debit"] ?? TX_TYPE_CONFIG["debit"]!;
+                const isPositive = cfg.sign === "+";
+
                 return (
-                  <div key={tx.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_120px_130px] gap-2 md:gap-4 px-6 py-3 hover:bg-muted/20 transition-colors">
+                  <div key={tx.id} className="px-6 py-3 grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_120px_130px] gap-1 md:gap-4 items-center" data-testid={`tx-row-${tx.id}`}>
                     <div>
-                      <p className="font-medium text-sm truncate">{tx.narration}</p>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">{formatDateTime(tx.createdAt)} · {tx.initiatedByName}</p>
+                      <p className="text-sm font-medium">{tx.narration ?? "—"}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{formatDateTime(tx.createdAt?.toString())}</p>
                     </div>
-                    <div className="flex items-center">
-                      <Badge variant="outline" className={`text-[10px] font-semibold uppercase border ${cfg.color}`}>
-                        {isCredit ? <ArrowDownRight className="w-3 h-3 mr-0.5" /> : <ArrowUpRight className="w-3 h-3 mr-0.5" />}
-                        {cfg.label}
-                      </Badge>
+                    <div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
                     </div>
-                    <div className="flex items-center text-sm text-muted-foreground truncate">
-                      {tx.relatedWalletName ?? "—"}
+                    <div className="text-sm text-muted-foreground">
+                      {tx.relatedWalletName ? (
+                        <Link href={`/wallets/${tx.relatedWalletId}`} className="hover:underline hover:text-foreground transition-colors">
+                          {tx.relatedWalletName}
+                        </Link>
+                      ) : "—"}
                     </div>
-                    <div className={`flex items-center justify-end font-mono font-bold text-sm ${isCredit ? "text-emerald-600" : "text-destructive"}`}>
-                      {cfg.sign}{formatCurrency(tx.amount)}
+                    <div className={`text-right font-bold font-mono text-sm ${isPositive ? "text-emerald-600" : "text-rose-600"}`}>
+                      {cfg.sign}{formatCurrency(Math.abs(parseFloat(String(tx.amount ?? 0))))}
                     </div>
-                    <div className="flex items-center justify-end font-mono text-sm text-foreground">
-                      {formatCurrency(tx.balanceAfter)}
+                    <div className="text-right font-mono text-sm text-muted-foreground">
+                      {formatCurrency(parseFloat(String(tx.balanceAfter ?? 0)))}
                     </div>
                   </div>
                 );
@@ -217,18 +230,14 @@ export default function WalletDetail() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t">
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages} · {total} records
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                    <PrevIcon className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="outline" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
-                    <NextIcon className="w-4 h-4" />
-                  </Button>
-                </div>
+              <div className="px-6 py-4 border-t flex items-center justify-between">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  <PrevIcon className="w-4 h-4 mr-1" /> Prev
+                </Button>
+                <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+                  Next <NextIcon className="w-4 h-4 ml-1" />
+                </Button>
               </div>
             )}
           </>
@@ -236,19 +245,24 @@ export default function WalletDetail() {
       </Card>
 
       {/* Transfer Dialog */}
-      <Dialog open={showTransfer} onOpenChange={open => !open && setShowTransfer(false)}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={showTransfer} onOpenChange={setShowTransfer}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Transfer Funds</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>From Wallet</Label>
-              <Select value={transferForm.fromWalletId} onValueChange={v => setTransferForm(f => ({ ...f, fromWalletId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select source wallet" /></SelectTrigger>
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">From Wallet</Label>
+              <Select
+                value={transferForm.fromWalletId}
+                onValueChange={(v) => setTransferForm(f => ({ ...f, fromWalletId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select wallet..." />
+                </SelectTrigger>
                 <SelectContent>
                   {allWallets.map(w => (
-                    <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.toWalletId}>
+                    <SelectItem key={w.id} value={w.id}>
                       {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
                     </SelectItem>
                   ))}
@@ -256,12 +270,17 @@ export default function WalletDetail() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>To Wallet</Label>
-              <Select value={transferForm.toWalletId} onValueChange={v => setTransferForm(f => ({ ...f, toWalletId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select destination wallet" /></SelectTrigger>
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">To Wallet</Label>
+              <Select
+                value={transferForm.toWalletId}
+                onValueChange={(v) => setTransferForm(f => ({ ...f, toWalletId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select wallet..." />
+                </SelectTrigger>
                 <SelectContent>
-                  {allWallets.map(w => (
-                    <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.fromWalletId}>
+                  {allWallets.filter(w => w.id !== transferForm.fromWalletId).map(w => (
+                    <SelectItem key={w.id} value={w.id}>
                       {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
                     </SelectItem>
                   ))}
@@ -269,39 +288,35 @@ export default function WalletDetail() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Amount (₦)</Label>
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount</Label>
               <Input
                 type="number"
-                min="1"
-                step="0.01"
                 placeholder="0.00"
                 className="font-mono"
                 value={transferForm.amount}
-                onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                onChange={(e) => setTransferForm(f => ({ ...f, amount: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Narration / Reason</Label>
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration</Label>
               <Input
-                placeholder="Office petty cash top-up"
+                placeholder="Purpose of transfer..."
                 value={transferForm.narration}
-                onChange={e => setTransferForm(f => ({ ...f, narration: e.target.value }))}
+                onChange={(e) => setTransferForm(f => ({ ...f, narration: e.target.value }))}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTransfer(false)}>Cancel</Button>
             <Button
-              onClick={handleTransfer}
               disabled={
-                !transferForm.fromWalletId ||
-                !transferForm.toWalletId ||
-                !transferForm.amount ||
-                !transferForm.narration ||
+                !transferForm.fromWalletId || !transferForm.toWalletId ||
+                !transferForm.amount || !transferForm.narration ||
                 transfer.isPending
               }
+              onClick={handleTransfer}
             >
-              {transfer.isPending ? "Transferring…" : "Confirm Transfer"}
+              {transfer.isPending ? "Processing..." : "Transfer"}
             </Button>
           </DialogFooter>
         </DialogContent>

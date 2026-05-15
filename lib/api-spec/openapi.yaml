@@ -566,6 +566,128 @@ paths:
               schema:
                 $ref: "#/components/schemas/Bill"
 
+  # ─── ATTACHMENTS ──────────────────────────────────────────────
+  /bills/{id}/attachments/request-upload:
+    post:
+      operationId: requestBillAttachmentUpload
+      tags: [bills]
+      summary: Request a presigned URL to upload a file attachment for a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestAttachmentUploadInput"
+      responses:
+        "200":
+          description: Presigned upload URL and attachment ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestAttachmentUploadResponse"
+
+  /bills/{id}/attachments/{attachmentId}/confirm:
+    post:
+      operationId: confirmBillAttachment
+      tags: [bills]
+      summary: Confirm that the file was successfully uploaded to storage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  /bills/{id}/attachments:
+    get:
+      operationId: listBillAttachments
+      tags: [bills]
+      summary: List confirmed attachments for a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attachment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attachments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BillAttachment"
+                required: [attachments]
+
+  /attachments/{attachmentId}:
+    delete:
+      operationId: deleteBillAttachment
+      tags: [bills]
+      summary: Delete a bill attachment
+      parameters:
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  /attachments/{attachmentId}/download:
+    get:
+      operationId: downloadBillAttachment
+      tags: [bills]
+      summary: Download a bill attachment file
+      parameters:
+        - name: attachmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
   /bills/{id}/comments:
     get:
       operationId: getBillComments
@@ -1645,6 +1767,49 @@ components:
         - partialPaymentsCount
         - partialPaymentsAmount
         - unreadNotificationsCount
+
+    BillAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+        billId:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+        uploadedBy:
+          type: string
+        uploadedByName:
+          type: string
+        uploadedAt:
+          type: string
+      required: [id, billId, fileName, uploadedBy, uploadedByName, uploadedAt]
+
+    RequestAttachmentUploadInput:
+      type: object
+      properties:
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        mimeType:
+          type: string
+      required: [fileName]
+
+    RequestAttachmentUploadResponse:
+      type: object
+      properties:
+        attachmentId:
+          type: string
+        uploadUrl:
+          type: string
+        objectPath:
+          type: string
+      required: [attachmentId, uploadUrl, objectPath]
 
     LiabilitiesReport:
       type: object

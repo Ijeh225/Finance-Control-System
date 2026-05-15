@@ -7,9 +7,10 @@ import {
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileBarChart, AlertCircle, Clock, CheckCircle2, SplitSquareVertical } from "lucide-react";
+import { FileBarChart, AlertCircle, Clock, CheckCircle2, SplitSquareVertical, Download } from "lucide-react";
 import { Link } from "wouter";
 import type { Bill, LiabilityAging } from "@workspace/api-client-react";
 
@@ -68,6 +69,23 @@ function LoadingRows() {
           <Skeleton className="h-6 w-24" />
         </div>
       ))}
+    </div>
+  );
+}
+
+function ExportButtons({ reportType }: { reportType: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <a href={`/api/export/reports/${reportType}?format=excel`} download>
+        <Button size="sm" variant="outline" className="text-xs" data-testid={`button-export-excel-${reportType}`}>
+          <Download className="w-3.5 h-3.5 mr-1.5" /> Excel
+        </Button>
+      </a>
+      <a href={`/api/export/reports/${reportType}?format=pdf`} download>
+        <Button size="sm" variant="outline" className="text-xs" data-testid={`button-export-pdf-${reportType}`}>
+          <Download className="w-3.5 h-3.5 mr-1.5" /> PDF
+        </Button>
+      </a>
     </div>
   );
 }
@@ -151,9 +169,12 @@ export default function Reports() {
         <TabsContent value="outstanding">
           <Card className="shadow-sm">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-500" /> Outstanding Liabilities by Vendor
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-500" /> Outstanding Liabilities by Vendor
+                </CardTitle>
+                <ExportButtons reportType="outstanding-liabilities" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 mt-3">
               {l1 ? <LoadingRows /> : !outstanding?.byVendor?.length ? (
@@ -171,9 +192,12 @@ export default function Reports() {
         <TabsContent value="pending">
           <Card className="shadow-sm">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" /> Pending Approvals
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" /> Pending Approvals
+                </CardTitle>
+                <ExportButtons reportType="pending-approvals" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 mt-3">
               {l2 ? <LoadingRows /> : !pending?.bills?.length ? (
@@ -191,9 +215,12 @@ export default function Reports() {
         <TabsContent value="paid">
           <Card className="shadow-sm">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Paid Today
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Paid Today
+                </CardTitle>
+                <ExportButtons reportType="paid-today" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 mt-3">
               {l3 ? <LoadingRows /> : !paidToday?.bills?.length ? (
@@ -211,9 +238,12 @@ export default function Reports() {
         <TabsContent value="partial">
           <Card className="shadow-sm">
             <CardHeader className="pb-0">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
-                <SplitSquareVertical className="w-4 h-4 text-violet-500" /> Partial Payments
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+                  <SplitSquareVertical className="w-4 h-4 text-violet-500" /> Partial Payments
+                </CardTitle>
+                <ExportButtons reportType="partial-payments" />
+              </div>
             </CardHeader>
             <CardContent className="p-0 mt-3">
               {l4 ? <LoadingRows /> : !partial?.bills?.length ? (

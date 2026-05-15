@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -6,13 +6,16 @@ import {
   useGetBillComments, getGetBillCommentsQueryKey,
   useGetBillAudit, getGetBillAuditQueryKey,
   useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill,
-  useAddBillComment, useUpdateBill,
+  useAddBillComment,
   getListBillsQueryKey,
+  useListBillAttachments, getListBillAttachmentsQueryKey,
+  useRequestBillAttachmentUpload,
+  useConfirmBillAttachment,
+  useDeleteBillAttachment,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -21,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpCircle,
   ChevronLeft, MessageSquare, Activity, User, Send,
+  Paperclip, Upload, Download, Trash2, FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,12 +45,20 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-50 text-red-700 border-red-200",
 };
 
+function formatFileSize(bytes?: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function BillDetail() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [comment, setComment] = useState("");
   const [approveComment, setApproveComment] = useState("");
@@ -55,6 +67,7 @@ export default function BillDetail() {
   const [partialAmount, setPartialAmount] = useState("");
   const [partialComment, setPartialComment] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: bill, isLoading: billLoading } = useGetBill(id!, {
     query: { enabled: !!id, queryKey: getGetBillQueryKey(id!) },
@@ -64,6 +77,9 @@ export default function BillDetail() {
   });
   const { data: auditData, isLoading: auditLoading } = useGetBillAudit(id!, {
     query: { enabled: !!id, queryKey: getGetBillAuditQueryKey(id!) },
+  });
+  const { data: attachmentsData, isLoading: attachmentsLoading } = useListBillAttachments(id!, {
+    query: { enabled: !!id, queryKey: getListBillAttachmentsQueryKey(id!) },
   });
 
   const invalidate = () => {
@@ -109,6 +125,45 @@ export default function BillDetail() {
       onError: () => toast({ title: "Failed to add comment", variant: "destructive" }),
     },
   });
+  const requestUpload = useRequestBillAttachmentUpload();
+  const confirmUpload = useConfirmBillAttachment();
+  const deleteAttachment = useDeleteBillAttachment({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListBillAttachmentsQueryKey(id!) });
+        qc.invalidateQueries({ queryKey: getGetBillQueryKey(id!) });
+        toast({ title: "Attachment deleted" });
+      },
+      onError: () => toast({ title: "Failed to delete attachment", variant: "destructive" }),
+    },
+  });
+
+  const handleFileUpload = async (file: File) => {
+    if (!id) return;
+    setIsUploading(true);
+    try {
+      const uploadData = await requestUpload.mutateAsync({
+        id,
+        data: { fileName: file.name, fileSize: file.size, mimeType: file.type || "application/octet-stream" },
+      });
+
+      await fetch(uploadData.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+
+      await confirmUpload.mutateAsync({ id, attachmentId: uploadData.attachmentId });
+      qc.invalidateQueries({ queryKey: getListBillAttachmentsQueryKey(id) });
+      qc.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
+      toast({ title: "Attachment uploaded" });
+    } catch {
+      toast({ title: "Upload failed — please try again", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   if (billLoading) {
     return (
@@ -131,6 +186,7 @@ export default function BillDetail() {
 
   const isMd = user?.role === "md";
   const canAct = isMd && ["pending", "on_hold", "partial", "overdue"].includes(bill.status ?? "");
+  const attachments = attachmentsData?.attachments ?? [];
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
@@ -175,7 +231,6 @@ export default function BillDetail() {
           </CardContent>
         </Card>
       </div>
-
 
       {canAct && (
         <Card className="shadow-sm border-primary/20">
@@ -238,9 +293,7 @@ export default function BillDetail() {
             )}
             {activeAction === "partial" && (
               <div className="space-y-3 pt-2 border-t">
-                <div className="flex gap-3">
-                  <Input type="number" placeholder="Approved amount (NGN)" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="max-w-xs font-mono" data-testid="input-partial-amount" />
-                </div>
+                <Input type="number" placeholder="Approved amount (NGN)" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="max-w-xs font-mono" data-testid="input-partial-amount" />
                 <Textarea placeholder="Optional comment..." value={partialComment} onChange={(e) => setPartialComment(e.target.value)} rows={2} />
                 <div className="flex gap-2">
                   <Button size="sm" className="border-violet-300 bg-violet-600 hover:bg-violet-700 text-white" disabled={partialApprove.isPending || !partialAmount} onClick={() => partialApprove.mutate({ id: id!, data: { approvedAmount: Number(partialAmount), comment: partialComment || undefined } })} data-testid="button-confirm-partial">
@@ -264,6 +317,99 @@ export default function BillDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Attachments */}
+      <Card className="shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold flex items-center gap-2">
+              <Paperclip className="w-4 h-4 text-primary" /> Attachments
+              {attachments.length > 0 && (
+                <span className="ml-1 text-xs font-normal text-muted-foreground">({attachments.length})</span>
+              )}
+            </CardTitle>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                data-testid="input-attachment-file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleFileUpload(file);
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-attachment"
+              >
+                <Upload className="w-3.5 h-3.5 mr-1.5" />
+                {isUploading ? "Uploading..." : "Attach File"}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {attachmentsLoading ? (
+            <div className="space-y-2">
+              {[1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : attachments.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No attachments yet. Attach an invoice or document above.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex items-center justify-between p-3 bg-muted/40 rounded border border-border/50 gap-3"
+                  data-testid={`attachment-${att.id}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{att.fileName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {att.uploadedByName} · {formatDateTime(att.uploadedAt)}
+                        {att.fileSize ? ` · ${formatFileSize(att.fileSize)}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <a
+                      href={`/api/attachments/${att.id}/download`}
+                      download={att.fileName}
+                      data-testid={`button-download-attachment-${att.id}`}
+                    >
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Download">
+                        <Download className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                    {(user?.role === "md" || att.uploadedBy === user?.id) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        disabled={deleteAttachment.isPending}
+                        onClick={() => deleteAttachment.mutate({ attachmentId: att.id })}
+                        data-testid={`button-delete-attachment-${att.id}`}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-sm">

@@ -7,3 +7,4 @@ export * from "./notifications";
 export * from "./comments";
 export * from "./audit";
 export * from "./sessions";
+export * from "./bill_attachments";

@@ -7,7 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, Building2, Phone, Mail } from "lucide-react";
+import { ChevronLeft, Building2, Phone, Mail, Download } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
@@ -55,11 +55,11 @@ export default function VendorDetail() {
         <ChevronLeft className="w-4 h-4 mr-1" /> Vendors
       </Button>
 
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-4 flex-wrap">
         <div className="w-14 h-14 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
           <Building2 className="w-7 h-7 text-primary" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">{vendor.name}</h1>
           <div className="flex flex-wrap items-center gap-4 mt-1.5">
             {vendor.email && (
@@ -73,6 +73,18 @@ export default function VendorDetail() {
               </span>
             )}
           </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <a href={`/api/export/vendors/${id}/statement?format=excel`} download data-testid="button-export-vendor-excel">
+            <Button size="sm" variant="outline" className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Excel
+            </Button>
+          </a>
+          <a href={`/api/export/vendors/${id}/statement?format=pdf`} download data-testid="button-export-vendor-pdf">
+            <Button size="sm" variant="outline" className="text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> PDF
+            </Button>
+          </a>
         </div>
       </div>
 

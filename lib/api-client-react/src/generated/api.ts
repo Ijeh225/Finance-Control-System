@@ -25,12 +25,14 @@ import type {
   Bill,
   BillDetail,
   Comment,
+  ConfirmBillAttachment200,
   CreateBillInput,
   CreateUserInput,
   CreateVendorInput,
   CreateWalletInput,
   DashboardSummary,
   DeactivateUser200,
+  DeleteBillAttachment200,
   EscalateBillBody,
   GetBillAudit200,
   GetBillComments200,
@@ -58,6 +60,7 @@ import type {
   LiabilityAging,
   ListAuditTrail200,
   ListAuditTrailParams,
+  ListBillAttachments200,
   ListBills200,
   ListBillsParams,
   ListNotifications200,
@@ -72,6 +75,8 @@ import type {
   Notification,
   PartialApproveBillBody,
   RejectBillBody,
+  RequestAttachmentUploadInput,
+  RequestAttachmentUploadResponse,
   TransferFunds200,
   TransferInput,
   UpdateBillInput,
@@ -1779,6 +1784,374 @@ export const useEscalateBill = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getEscalateBillMutationOptions(options));
     }
+
+export const getRequestBillAttachmentUploadUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/attachments/request-upload`
+}
+
+/**
+ * @summary Request a presigned URL to upload a file attachment for a bill
+ */
+export const requestBillAttachmentUpload = async (id: string,
+    requestAttachmentUploadInput: RequestAttachmentUploadInput, options?: RequestInit): Promise<RequestAttachmentUploadResponse> => {
+
+  return customFetch<RequestAttachmentUploadResponse>(getRequestBillAttachmentUploadUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      requestAttachmentUploadInput,)
+  }
+);}
+
+
+
+
+export const getRequestBillAttachmentUploadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBillAttachmentUpload>>, TError,{id: string;data: BodyType<RequestAttachmentUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestBillAttachmentUpload>>, TError,{id: string;data: BodyType<RequestAttachmentUploadInput>}, TContext> => {
+
+const mutationKey = ['requestBillAttachmentUpload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestBillAttachmentUpload>>, {id: string;data: BodyType<RequestAttachmentUploadInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestBillAttachmentUpload(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestBillAttachmentUploadMutationResult = NonNullable<Awaited<ReturnType<typeof requestBillAttachmentUpload>>>
+    export type RequestBillAttachmentUploadMutationBody = BodyType<RequestAttachmentUploadInput>
+    export type RequestBillAttachmentUploadMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Request a presigned URL to upload a file attachment for a bill
+ */
+export const useRequestBillAttachmentUpload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestBillAttachmentUpload>>, TError,{id: string;data: BodyType<RequestAttachmentUploadInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestBillAttachmentUpload>>,
+        TError,
+        {id: string;data: BodyType<RequestAttachmentUploadInput>},
+        TContext
+      > => {
+      return useMutation(getRequestBillAttachmentUploadMutationOptions(options));
+    }
+
+export const getConfirmBillAttachmentUrl = (id: string,
+    attachmentId: string,) => {
+
+
+
+
+  return `/api/bills/${id}/attachments/${attachmentId}/confirm`
+}
+
+/**
+ * @summary Confirm that the file was successfully uploaded to storage
+ */
+export const confirmBillAttachment = async (id: string,
+    attachmentId: string, options?: RequestInit): Promise<ConfirmBillAttachment200> => {
+
+  return customFetch<ConfirmBillAttachment200>(getConfirmBillAttachmentUrl(id,attachmentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getConfirmBillAttachmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBillAttachment>>, TError,{id: string;attachmentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmBillAttachment>>, TError,{id: string;attachmentId: string}, TContext> => {
+
+const mutationKey = ['confirmBillAttachment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmBillAttachment>>, {id: string;attachmentId: string}> = (props) => {
+          const {id,attachmentId} = props ?? {};
+
+          return  confirmBillAttachment(id,attachmentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmBillAttachmentMutationResult = NonNullable<Awaited<ReturnType<typeof confirmBillAttachment>>>
+
+    export type ConfirmBillAttachmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Confirm that the file was successfully uploaded to storage
+ */
+export const useConfirmBillAttachment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmBillAttachment>>, TError,{id: string;attachmentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmBillAttachment>>,
+        TError,
+        {id: string;attachmentId: string},
+        TContext
+      > => {
+      return useMutation(getConfirmBillAttachmentMutationOptions(options));
+    }
+
+export const getListBillAttachmentsUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/attachments`
+}
+
+/**
+ * @summary List confirmed attachments for a bill
+ */
+export const listBillAttachments = async (id: string, options?: RequestInit): Promise<ListBillAttachments200> => {
+
+  return customFetch<ListBillAttachments200>(getListBillAttachmentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBillAttachmentsQueryKey = (id: string,) => {
+    return [
+    `/api/bills/${id}/attachments`
+    ] as const;
+    }
+
+
+export const getListBillAttachmentsQueryOptions = <TData = Awaited<ReturnType<typeof listBillAttachments>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBillAttachments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBillAttachmentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBillAttachments>>> = ({ signal }) => listBillAttachments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBillAttachments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBillAttachmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listBillAttachments>>>
+export type ListBillAttachmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List confirmed attachments for a bill
+ */
+
+export function useListBillAttachments<TData = Awaited<ReturnType<typeof listBillAttachments>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBillAttachments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBillAttachmentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeleteBillAttachmentUrl = (attachmentId: string,) => {
+
+
+
+
+  return `/api/attachments/${attachmentId}`
+}
+
+/**
+ * @summary Delete a bill attachment
+ */
+export const deleteBillAttachment = async (attachmentId: string, options?: RequestInit): Promise<DeleteBillAttachment200> => {
+
+  return customFetch<DeleteBillAttachment200>(getDeleteBillAttachmentUrl(attachmentId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteBillAttachmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBillAttachment>>, TError,{attachmentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteBillAttachment>>, TError,{attachmentId: string}, TContext> => {
+
+const mutationKey = ['deleteBillAttachment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteBillAttachment>>, {attachmentId: string}> = (props) => {
+          const {attachmentId} = props ?? {};
+
+          return  deleteBillAttachment(attachmentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteBillAttachmentMutationResult = NonNullable<Awaited<ReturnType<typeof deleteBillAttachment>>>
+
+    export type DeleteBillAttachmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a bill attachment
+ */
+export const useDeleteBillAttachment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteBillAttachment>>, TError,{attachmentId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteBillAttachment>>,
+        TError,
+        {attachmentId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteBillAttachmentMutationOptions(options));
+    }
+
+export const getDownloadBillAttachmentUrl = (attachmentId: string,) => {
+
+
+
+
+  return `/api/attachments/${attachmentId}/download`
+}
+
+/**
+ * @summary Download a bill attachment file
+ */
+export const downloadBillAttachment = async (attachmentId: string, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadBillAttachmentUrl(attachmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadBillAttachmentQueryKey = (attachmentId: string,) => {
+    return [
+    `/api/attachments/${attachmentId}/download`
+    ] as const;
+    }
+
+
+export const getDownloadBillAttachmentQueryOptions = <TData = Awaited<ReturnType<typeof downloadBillAttachment>>, TError = ErrorType<unknown>>(attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBillAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadBillAttachmentQueryKey(attachmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadBillAttachment>>> = ({ signal }) => downloadBillAttachment(attachmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(attachmentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadBillAttachment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadBillAttachmentQueryResult = NonNullable<Awaited<ReturnType<typeof downloadBillAttachment>>>
+export type DownloadBillAttachmentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Download a bill attachment file
+ */
+
+export function useDownloadBillAttachment<TData = Awaited<ReturnType<typeof downloadBillAttachment>>, TError = ErrorType<unknown>>(
+ attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadBillAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadBillAttachmentQueryOptions(attachmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetBillCommentsUrl = (id: string,) => {
 

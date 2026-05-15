@@ -709,6 +709,80 @@ export const EscalateBillResponse = zod.object({
 
 
 /**
+ * @summary Request a presigned URL to upload a file attachment for a bill
+ */
+export const RequestBillAttachmentUploadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RequestBillAttachmentUploadBody = zod.object({
+  "fileName": zod.string(),
+  "fileSize": zod.number().optional(),
+  "mimeType": zod.string().optional()
+})
+
+export const RequestBillAttachmentUploadResponse = zod.object({
+  "attachmentId": zod.string(),
+  "uploadUrl": zod.string(),
+  "objectPath": zod.string()
+})
+
+
+/**
+ * @summary Confirm that the file was successfully uploaded to storage
+ */
+export const ConfirmBillAttachmentParams = zod.object({
+  "id": zod.coerce.string(),
+  "attachmentId": zod.coerce.string()
+})
+
+export const ConfirmBillAttachmentResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary List confirmed attachments for a bill
+ */
+export const ListBillAttachmentsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListBillAttachmentsResponse = zod.object({
+  "attachments": zod.array(zod.object({
+  "id": zod.string(),
+  "billId": zod.string(),
+  "fileName": zod.string(),
+  "fileSize": zod.number().optional(),
+  "mimeType": zod.string().optional(),
+  "uploadedBy": zod.string(),
+  "uploadedByName": zod.string(),
+  "uploadedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Delete a bill attachment
+ */
+export const DeleteBillAttachmentParams = zod.object({
+  "attachmentId": zod.coerce.string()
+})
+
+export const DeleteBillAttachmentResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Download a bill attachment file
+ */
+export const DownloadBillAttachmentParams = zod.object({
+  "attachmentId": zod.coerce.string()
+})
+
+
+/**
  * @summary Get comments for a bill
  */
 export const GetBillCommentsParams = zod.object({
