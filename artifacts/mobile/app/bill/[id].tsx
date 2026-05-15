@@ -29,12 +29,18 @@ export default function BillDetailScreen() {
   const holdMutation = useHoldBill();
   const partialMutation = usePartialApproveBill();
   const commentMutation = useAddBillComment();
+  const escalateMutation = useEscalateBill();
+
+  const isMd = authUser?.role === 'md';
 
   const actionOptions: ActionOption[] = [
-    { id: 'approve', label: 'Approve', icon: 'check-circle', color: colors.success },
-    { id: 'partial', label: 'Partial', icon: 'pie-chart', color: '#3B82F6', requiresAmount: true },
-    { id: 'reject', label: 'Reject', icon: 'x-circle', color: colors.destructive },
-    { id: 'hold', label: 'Hold', icon: 'pause-circle', color: '#F59E0B' },
+    ...(isMd ? [
+      { id: 'approve', label: 'Approve', icon: 'check-circle' as const, color: colors.success },
+      { id: 'partial', label: 'Partial Approve', icon: 'pie-chart' as const, color: '#3B82F6', requiresAmount: true },
+      { id: 'reject', label: 'Reject', icon: 'x-circle' as const, color: colors.destructive },
+      { id: 'hold', label: 'Hold', icon: 'pause-circle' as const, color: '#F59E0B' },
+    ] : []),
+    { id: 'escalate', label: 'Escalate', icon: 'alert-triangle', color: '#EF4444' },
     { id: 'comment', label: 'Add Comment', icon: 'message-square', color: colors.primary },
   ];
 
@@ -54,12 +60,15 @@ export default function BillDetailScreen() {
       } else if (actionId === 'hold') {
         await holdMutation.mutateAsync({ id: id as string, data: { comment } });
         Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } else if (actionId === 'escalate') {
+        await escalateMutation.mutateAsync({ id: id as string, data: { comment } });
+        Platform.OS !== 'web' && Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       } else if (actionId === 'comment') {
         await commentMutation.mutateAsync({ id: id as string, data: { text: comment, authorId: authUser?.id ?? '' } });
       }
       refetch();
     } catch (error) {
-      console.error(error);
+      void error;
     }
   };
 
@@ -158,7 +167,7 @@ export default function BillDetailScreen() {
         title="Command Control"
         options={actionOptions}
         onAction={handleAction}
-        isLoading={approveMutation.isPending || rejectMutation.isPending || holdMutation.isPending || partialMutation.isPending || commentMutation.isPending}
+        isLoading={approveMutation.isPending || rejectMutation.isPending || holdMutation.isPending || partialMutation.isPending || commentMutation.isPending || escalateMutation.isPending}
       />
     </View>
   );
