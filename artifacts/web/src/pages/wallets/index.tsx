@@ -25,7 +25,7 @@ export default function Wallets() {
   const [editWallet, setEditWallet] = useState<{ id: string; name: string; balance: number } | null>(null);
   const [form, setForm] = useState({ name: "", bankName: "", accountNumber: "", currency: "NGN", balance: "" });
 
-  const { data, isLoading } = useListWallets({ query: { queryKey: getListWalletsQueryKey() } });
+  const { data, isLoading } = useListWallets(undefined, { query: { queryKey: getListWalletsQueryKey() } });
 
   const createWallet = useCreateWallet({
     mutation: {

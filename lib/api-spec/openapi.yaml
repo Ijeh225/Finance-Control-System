@@ -251,6 +251,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update a user's details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserInput"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deactivateUser
+      tags: [users]
+      summary: Deactivate a user (soft delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
+  /users/{id}/profile:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user profile with wallets and bill stats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
 
   # ─── BILLS ───────────────────────────────────────────────────
   /bills:
@@ -668,6 +731,11 @@ paths:
       operationId: listWallets
       tags: [wallets]
       summary: List all wallets/accounts
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: List of wallets
@@ -996,9 +1064,11 @@ components:
           type: string
         phone:
           type: string
+        isActive:
+          type: boolean
         createdAt:
           type: string
-      required: [id, name, role, createdAt]
+      required: [id, name, role, isActive, createdAt]
 
     CreateUserInput:
       type: object
@@ -1012,7 +1082,57 @@ components:
           type: string
         phone:
           type: string
-      required: [name, role]
+        password:
+          type: string
+      required: [name, role, password]
+
+    UpdateUserInput:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+          enum: [md, treasury, payment_assistant]
+        email:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        password:
+          type: string
+
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            wallets:
+              type: array
+              items:
+                $ref: "#/components/schemas/Wallet"
+            billStats:
+              type: object
+              properties:
+                total:
+                  type: integer
+                pending:
+                  type: integer
+                approved:
+                  type: integer
+                totalAmount:
+                  type: number
+                paidAmount:
+                  type: number
+                outstandingAmount:
+                  type: number
+              required: [total, pending, approved, totalAmount, paidAmount, outstandingAmount]
+            recentBills:
+              type: array
+              items:
+                $ref: "#/components/schemas/Bill"
+          required: [wallets, billStats, recentBills]
 
     Bill:
       type: object
@@ -1225,6 +1345,10 @@ components:
           type: string
         isLow:
           type: boolean
+        ownedBy:
+          type: string
+        ownedByName:
+          type: string
         createdAt:
           type: string
       required: [id, name, balance, currency, createdAt]
@@ -1252,6 +1376,8 @@ components:
         balance:
           type: number
         currency:
+          type: string
+        ownedBy:
           type: string
       required: [name, balance, currency]
 

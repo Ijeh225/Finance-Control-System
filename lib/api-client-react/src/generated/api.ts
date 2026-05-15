@@ -30,6 +30,7 @@ import type {
   CreateVendorInput,
   CreateWalletInput,
   DashboardSummary,
+  DeactivateUser200,
   EscalateBillBody,
   GetBillAudit200,
   GetBillComments200,
@@ -64,14 +65,17 @@ import type {
   ListVendors200,
   ListVendorsParams,
   ListWallets200,
+  ListWalletsParams,
   MarkAllNotificationsRead200,
   MarkAllNotificationsReadBody,
   Notification,
   PartialApproveBillBody,
   RejectBillBody,
   UpdateBillInput,
+  UpdateUserInput,
   UpdateWalletBody,
   User,
+  UserProfile,
   Vendor,
   VendorDetail,
   Wallet,
@@ -877,6 +881,225 @@ export function useGetUser<TData = Awaited<ReturnType<typeof getUser>>, TError =
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetUserQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateUserUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}`
+}
+
+/**
+ * @summary Update a user's details
+ */
+export const updateUser = async (id: string,
+    updateUserInput: UpdateUserInput, options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getUpdateUserUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateUserInput,)
+  }
+);}
+
+
+
+
+export const getUpdateUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UpdateUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UpdateUserInput>}, TContext> => {
+
+const mutationKey = ['updateUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUser>>, {id: string;data: BodyType<UpdateUserInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateUser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateUserMutationResult = NonNullable<Awaited<ReturnType<typeof updateUser>>>
+    export type UpdateUserMutationBody = BodyType<UpdateUserInput>
+    export type UpdateUserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a user's details
+ */
+export const useUpdateUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UpdateUserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateUser>>,
+        TError,
+        {id: string;data: BodyType<UpdateUserInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateUserMutationOptions(options));
+    }
+
+export const getDeactivateUserUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}`
+}
+
+/**
+ * @summary Deactivate a user (soft delete)
+ */
+export const deactivateUser = async (id: string, options?: RequestInit): Promise<DeactivateUser200> => {
+
+  return customFetch<DeactivateUser200>(getDeactivateUserUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeactivateUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateUser>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deactivateUser>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deactivateUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deactivateUser>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deactivateUser(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeactivateUserMutationResult = NonNullable<Awaited<ReturnType<typeof deactivateUser>>>
+
+    export type DeactivateUserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Deactivate a user (soft delete)
+ */
+export const useDeactivateUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deactivateUser>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deactivateUser>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeactivateUserMutationOptions(options));
+    }
+
+export const getGetUserProfileUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}/profile`
+}
+
+/**
+ * @summary Get user profile with wallets and bill stats
+ */
+export const getUserProfile = async (id: string, options?: RequestInit): Promise<UserProfile> => {
+
+  return customFetch<UserProfile>(getGetUserProfileUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserProfileQueryKey = (id: string,) => {
+    return [
+    `/api/users/${id}/profile`
+    ] as const;
+    }
+
+
+export const getGetUserProfileQueryOptions = <TData = Awaited<ReturnType<typeof getUserProfile>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserProfileQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserProfile>>> = ({ signal }) => getUserProfile(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserProfileQueryResult = NonNullable<Awaited<ReturnType<typeof getUserProfile>>>
+export type GetUserProfileQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get user profile with wallets and bill stats
+ */
+
+export function useGetUserProfile<TData = Awaited<ReturnType<typeof getUserProfile>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserProfile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserProfileQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2088,20 +2311,27 @@ export function useGetVendorLiabilities<TData = Awaited<ReturnType<typeof getVen
 
 
 
-export const getListWalletsUrl = () => {
+export const getListWalletsUrl = (params?: ListWalletsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/wallets`
+  return stringifiedParams.length > 0 ? `/api/wallets?${stringifiedParams}` : `/api/wallets`
 }
 
 /**
  * @summary List all wallets/accounts
  */
-export const listWallets = async ( options?: RequestInit): Promise<ListWallets200> => {
+export const listWallets = async (params?: ListWalletsParams, options?: RequestInit): Promise<ListWallets200> => {
 
-  return customFetch<ListWallets200>(getListWalletsUrl(),
+  return customFetch<ListWallets200>(getListWalletsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2114,23 +2344,23 @@ export const listWallets = async ( options?: RequestInit): Promise<ListWallets20
 
 
 
-export const getListWalletsQueryKey = () => {
+export const getListWalletsQueryKey = (params?: ListWalletsParams,) => {
     return [
-    `/api/wallets`
+    `/api/wallets`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListWalletsQueryOptions = <TData = Awaited<ReturnType<typeof listWallets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWallets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListWalletsQueryOptions = <TData = Awaited<ReturnType<typeof listWallets>>, TError = ErrorType<unknown>>(params?: ListWalletsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWallets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListWalletsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListWalletsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWallets>>> = ({ signal }) => listWallets({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWallets>>> = ({ signal }) => listWallets(params, { signal, ...requestOptions });
 
 
 
@@ -2148,11 +2378,11 @@ export type ListWalletsQueryError = ErrorType<unknown>
  */
 
 export function useListWallets<TData = Awaited<ReturnType<typeof listWallets>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWallets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListWalletsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWallets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListWalletsQueryOptions(options)
+  const queryOptions = getListWalletsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

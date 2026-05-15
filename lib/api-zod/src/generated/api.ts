@@ -159,6 +159,8 @@ export const GetWalletBalancesResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
 })),
   "totalBalance": zod.number()
@@ -200,6 +202,7 @@ export const ListUsersResponse = zod.object({
   "role": zod.enum(['md', 'treasury', 'payment_assistant']),
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
+  "isActive": zod.boolean(),
   "createdAt": zod.string()
 }))
 })
@@ -212,7 +215,8 @@ export const CreateUserBody = zod.object({
   "name": zod.string(),
   "role": zod.enum(['md', 'treasury', 'payment_assistant']),
   "email": zod.string().optional(),
-  "phone": zod.string().optional()
+  "phone": zod.string().optional(),
+  "password": zod.string()
 })
 
 
@@ -229,8 +233,109 @@ export const GetUserResponse = zod.object({
   "role": zod.enum(['md', 'treasury', 'payment_assistant']),
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
+  "isActive": zod.boolean(),
   "createdAt": zod.string()
 })
+
+
+/**
+ * @summary Update a user's details
+ */
+export const UpdateUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateUserBody = zod.object({
+  "name": zod.string().optional(),
+  "role": zod.enum(['md', 'treasury', 'payment_assistant']).optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "isActive": zod.boolean().optional(),
+  "password": zod.string().optional()
+})
+
+export const UpdateUserResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['md', 'treasury', 'payment_assistant']),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Deactivate a user (soft delete)
+ */
+export const DeactivateUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeactivateUserResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get user profile with wallets and bill stats
+ */
+export const GetUserProfileParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetUserProfileResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['md', 'treasury', 'payment_assistant']),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "wallets": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "balance": zod.number(),
+  "currency": zod.string(),
+  "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
+  "createdAt": zod.string()
+})),
+  "billStats": zod.object({
+  "total": zod.number(),
+  "pending": zod.number(),
+  "approved": zod.number(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "outstandingAmount": zod.number()
+}),
+  "recentBills": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "approvedAmount": zod.number().optional(),
+  "paidAmount": zod.number(),
+  "outstandingBalance": zod.number(),
+  "scheduledDate": zod.string(),
+  "dueDate": zod.string().optional(),
+  "walletId": zod.string().optional(),
+  "walletName": zod.string().optional(),
+  "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "hasAttachment": zod.boolean().optional(),
+  "overdueDays": zod.number().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}))
+}))
 
 
 /**
@@ -739,6 +844,10 @@ export const GetVendorLiabilitiesResponse = zod.object({
 /**
  * @summary List all wallets/accounts
  */
+export const ListWalletsQueryParams = zod.object({
+  "userId": zod.coerce.string().optional()
+})
+
 export const ListWalletsResponse = zod.object({
   "wallets": zod.array(zod.object({
   "id": zod.string(),
@@ -748,6 +857,8 @@ export const ListWalletsResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
 }))
 })
@@ -761,7 +872,8 @@ export const CreateWalletBody = zod.object({
   "bankName": zod.string().optional(),
   "accountNumber": zod.string().optional(),
   "balance": zod.number(),
-  "currency": zod.string()
+  "currency": zod.string(),
+  "ownedBy": zod.string().optional()
 })
 
 
@@ -780,6 +892,8 @@ export const GetWalletResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
 }).and(zod.object({
   "recentTransactions": zod.array(zod.object({
@@ -827,6 +941,8 @@ export const UpdateWalletResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "ownedBy": zod.string().optional(),
+  "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
 })
 

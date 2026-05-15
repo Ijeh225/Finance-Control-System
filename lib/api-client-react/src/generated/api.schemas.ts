@@ -24,6 +24,7 @@ export interface User {
   role: UserRole;
   email?: string;
   phone?: string;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -41,6 +42,47 @@ export interface CreateUserInput {
   role: CreateUserInputRole;
   email?: string;
   phone?: string;
+  password: string;
+}
+
+export type UpdateUserInputRole = typeof UpdateUserInputRole[keyof typeof UpdateUserInputRole];
+
+
+export const UpdateUserInputRole = {
+  md: 'md',
+  treasury: 'treasury',
+  payment_assistant: 'payment_assistant',
+} as const;
+
+export interface UpdateUserInput {
+  name?: string;
+  role?: UpdateUserInputRole;
+  email?: string;
+  phone?: string;
+  isActive?: boolean;
+  password?: string;
+}
+
+export type UserProfileBillStats = {
+  total: number;
+  pending: number;
+  approved: number;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+};
+
+export interface Wallet {
+  id: string;
+  name: string;
+  bankName?: string;
+  accountNumber?: string;
+  balance: number;
+  currency: string;
+  isLow?: boolean;
+  ownedBy?: string;
+  ownedByName?: string;
+  createdAt: string;
 }
 
 export type BillPriority = typeof BillPriority[keyof typeof BillPriority];
@@ -88,6 +130,12 @@ export interface Bill {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type UserProfile = User & {
+  wallets: Wallet[];
+  billStats: UserProfileBillStats;
+  recentBills: Bill[];
+};
 
 export interface Comment {
   id: string;
@@ -195,17 +243,6 @@ export interface LiabilityAging {
   aging30plus: number;
 }
 
-export interface Wallet {
-  id: string;
-  name: string;
-  bankName?: string;
-  accountNumber?: string;
-  balance: number;
-  currency: string;
-  isLow?: boolean;
-  createdAt: string;
-}
-
 export type WalletDetail = Wallet & {
   recentTransactions: Bill[];
 };
@@ -216,6 +253,7 @@ export interface CreateWalletInput {
   accountNumber?: string;
   balance: number;
   currency: string;
+  ownedBy?: string;
 }
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];
@@ -343,6 +381,10 @@ export type ListUsers200 = {
   users: User[];
 };
 
+export type DeactivateUser200 = {
+  success: boolean;
+};
+
 export type ListBillsParams = {
 status?: ListBillsStatus;
 userId?: string;
@@ -422,6 +464,10 @@ search?: string;
 
 export type ListVendors200 = {
   vendors: Vendor[];
+};
+
+export type ListWalletsParams = {
+userId?: string;
 };
 
 export type ListWallets200 = {

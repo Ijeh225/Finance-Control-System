@@ -75,7 +75,7 @@ export default function BillsList() {
   const { data: vendorsData } = useListVendors(undefined, {
     query: { queryKey: getListVendorsQueryKey() },
   });
-  const { data: walletsData } = useListWallets({
+  const { data: walletsData } = useListWallets(undefined, {
     query: { queryKey: getListWalletsQueryKey() },
   });
 

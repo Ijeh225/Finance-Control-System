@@ -10,6 +10,7 @@ export const walletsTable = pgTable("wallets", {
   balance: numeric("balance", { precision: 15, scale: 2 }).notNull().default("0"),
   currency: text("currency").notNull().default("NGN"),
   isLow: boolean("is_low").notNull().default(false),
+  ownedBy: text("owned_by"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

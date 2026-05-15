@@ -76,7 +76,10 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavItem href="/reports" icon={<FileBarChart className="w-4 h-4" />} label="Reports" isActive={location.startsWith("/reports")} />
           
           {user?.role === 'md' && (
-            <NavItem href="/audit" icon={<Activity className="w-4 h-4" />} label="Audit Log" isActive={location.startsWith("/audit")} />
+            <>
+              <NavItem href="/users" icon={<Users className="w-4 h-4" />} label="User Management" isActive={location.startsWith("/users")} />
+              <NavItem href="/audit" icon={<Activity className="w-4 h-4" />} label="Audit Log" isActive={location.startsWith("/audit")} />
+            </>
           )}
         </nav>
 

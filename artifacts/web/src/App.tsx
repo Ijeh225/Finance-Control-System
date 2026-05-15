@@ -18,6 +18,8 @@ import Notifications from "@/pages/notifications/index";
 import Reports from "@/pages/reports/index";
 import Audit from "@/pages/audit/index";
 import Settings from "@/pages/settings/index";
+import UsersList from "@/pages/users/index";
+import UserProfile from "@/pages/users/[id]";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -59,6 +61,8 @@ function AppRoutes() {
       <Route path="/wallets" component={() => <ProtectedRoute component={Wallets} />} />
       <Route path="/notifications" component={() => <ProtectedRoute component={Notifications} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={Reports} />} />
+      <Route path="/users" component={() => <ProtectedRoute component={UsersList} />} />
+      <Route path="/users/:id" component={() => <ProtectedRoute component={UserProfile} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={Audit} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
       <Route component={NotFound} />

@@ -40,10 +40,10 @@ export async function seedIfEmpty() {
     const mrCId = uid();
 
     await db.insert(usersTable).values([
-      { id: mdId, name: "MD — Chief Executive", role: "md", email: "md@fincommand.ng", phone: "+234 800 000 0001", passwordHash: mdHash },
-      { id: mrAId, name: "Mr A (Treasury)", role: "treasury", email: "mra@fincommand.ng", phone: "+234 800 000 0002", passwordHash: mrAHash },
-      { id: mrBId, name: "Mr B (Payments)", role: "payment_assistant", email: "mrb@fincommand.ng", phone: "+234 800 000 0003", passwordHash: mrBHash },
-      { id: mrCId, name: "Mr C (Payments)", role: "payment_assistant", email: "mrc@fincommand.ng", phone: "+234 800 000 0004", passwordHash: mrCHash },
+      { id: mdId, name: "MD — Chief Executive", role: "md", email: "md@fincommand.ng", phone: "+234 800 000 0001", passwordHash: mdHash, isActive: true },
+      { id: mrAId, name: "Mr A (Treasury)", role: "treasury", email: "mra@fincommand.ng", phone: "+234 800 000 0002", passwordHash: mrAHash, isActive: true },
+      { id: mrBId, name: "Mr B (Payments)", role: "payment_assistant", email: "mrb@fincommand.ng", phone: "+234 800 000 0003", passwordHash: mrBHash, isActive: true },
+      { id: mrCId, name: "Mr C (Payments)", role: "payment_assistant", email: "mrc@fincommand.ng", phone: "+234 800 000 0004", passwordHash: mrCHash, isActive: true },
     ]);
 
     const v1Id = uid(); const v2Id = uid(); const v3Id = uid();
