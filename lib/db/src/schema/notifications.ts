@@ -16,6 +16,7 @@ export const notificationsTable = pgTable("notifications", {
       "overdue_warning",
       "duplicate_detected",
       "escalated",
+      "attachment_uploaded",
     ],
   }).notNull(),
   title: text("title").notNull(),

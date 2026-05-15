@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
 import { eq, and } from "drizzle-orm";
-import { db, billAttachmentsTable, billsTable } from "@workspace/db";
+import { db, billAttachmentsTable, billsTable, notificationsTable, usersTable } from "@workspace/db";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { Readable } from "stream";
 
@@ -31,6 +31,48 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+}
+
+/**
+ * Fire "attachment uploaded" notifications:
+ * - All MD users always receive a notification.
+ * - If the uploader is not the bill creator, the bill creator also receives one.
+ */
+async function notifyAttachmentUploaded(
+  billId: string,
+  billDescription: string,
+  billCreatedBy: string,
+  uploaderId: string,
+  fileName: string,
+) {
+  const title = "New Attachment";
+  const body = `New attachment on "${billDescription}": ${fileName}`;
+
+  // Notify every MD user
+  const mdUsers = await db.select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.role, "md"));
+
+  const recipientIds = new Set<string>(mdUsers.map(u => u.id));
+
+  // Also notify the bill creator if they are not the uploader
+  if (billCreatedBy !== uploaderId) {
+    recipientIds.add(billCreatedBy);
+  }
+
+  // Never notify the uploader (they already know about it)
+  recipientIds.delete(uploaderId);
+
+  for (const userId of recipientIds) {
+    await db.insert(notificationsTable).values({
+      id: uid(),
+      userId,
+      type: "attachment_uploaded",
+      title,
+      body,
+      billId,
+    });
+  }
 }
 
 /**
@@ -93,6 +135,8 @@ router.post("/bills/:id/attachments", upload.single("file"), async (req, res): P
     });
 
     await db.update(billsTable).set({ hasAttachment: true }).where(eq(billsTable.id, billId));
+
+    await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, actor.id, file.originalname);
 
     res.status(201).json({
       id: attachmentId,
@@ -194,6 +238,12 @@ router.post("/bills/:id/attachments/:attachmentId/confirm", async (req, res): Pr
     return;
   }
 
+  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
+  if (!bill) {
+    res.status(404).json({ error: "Bill not found" });
+    return;
+  }
+
   await db.update(billAttachmentsTable)
     .set({ confirmed: true })
     .where(eq(billAttachmentsTable.id, attachmentId));
@@ -201,6 +251,8 @@ router.post("/bills/:id/attachments/:attachmentId/confirm", async (req, res): Pr
   await db.update(billsTable)
     .set({ hasAttachment: true })
     .where(eq(billsTable.id, billId));
+
+  await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, actor.id, attachment.fileName);
 
   res.json({ ok: true });
 });
