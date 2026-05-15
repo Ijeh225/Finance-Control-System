@@ -23,6 +23,7 @@ import type {
   AddBillCommentBody,
   ApproveBillBody,
   Bill,
+  BillAttachment,
   BillDetail,
   Comment,
   ConfirmBillAttachment200,
@@ -85,6 +86,7 @@ import type {
   UpdateBillInput,
   UpdateUserInput,
   UpdateWalletBody,
+  UploadBillAttachmentBody,
   User,
   UserProfile,
   Vendor,
@@ -1930,6 +1932,80 @@ export const useConfirmBillAttachment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getConfirmBillAttachmentMutationOptions(options));
+    }
+
+export const getUploadBillAttachmentUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/attachments`
+}
+
+/**
+ * @summary Upload a file attachment for a bill (multipart/form-data)
+ */
+export const uploadBillAttachment = async (id: string,
+    uploadBillAttachmentBody: UploadBillAttachmentBody, options?: RequestInit): Promise<BillAttachment> => {
+    const formData = new FormData();
+formData.append(`file`, uploadBillAttachmentBody.file);
+
+  return customFetch<BillAttachment>(getUploadBillAttachmentUrl(id),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getUploadBillAttachmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBillAttachment>>, TError,{id: string;data: BodyType<UploadBillAttachmentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadBillAttachment>>, TError,{id: string;data: BodyType<UploadBillAttachmentBody>}, TContext> => {
+
+const mutationKey = ['uploadBillAttachment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadBillAttachment>>, {id: string;data: BodyType<UploadBillAttachmentBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  uploadBillAttachment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadBillAttachmentMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBillAttachment>>>
+    export type UploadBillAttachmentMutationBody = BodyType<UploadBillAttachmentBody>
+    export type UploadBillAttachmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Upload a file attachment for a bill (multipart/form-data)
+ */
+export const useUploadBillAttachment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadBillAttachment>>, TError,{id: string;data: BodyType<UploadBillAttachmentBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadBillAttachment>>,
+        TError,
+        {id: string;data: BodyType<UploadBillAttachmentBody>},
+        TContext
+      > => {
+      return useMutation(getUploadBillAttachmentMutationOptions(options));
     }
 
 export const getListBillAttachmentsUrl = (id: string,) => {

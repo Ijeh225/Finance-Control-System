@@ -522,6 +522,11 @@ export type ConfirmBillAttachment200 = {
   ok: boolean;
 };
 
+export type UploadBillAttachmentBody = {
+  /** The file to upload (binary) */
+  file: string;
+};
+
 export type ListBillAttachments200 = {
   attachments: BillAttachment[];
 };

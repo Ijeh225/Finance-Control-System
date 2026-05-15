@@ -742,6 +742,18 @@ export const ConfirmBillAttachmentResponse = zod.object({
 
 
 /**
+ * @summary Upload a file attachment for a bill (multipart/form-data)
+ */
+export const UploadBillAttachmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UploadBillAttachmentBody = zod.object({
+  "file": zod.string().describe('The file to upload (binary)')
+})
+
+
+/**
  * @summary List confirmed attachments for a bill
  */
 export const ListBillAttachmentsParams = zod.object({

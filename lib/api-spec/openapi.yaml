@@ -621,6 +621,34 @@ paths:
                 required: [ok]
 
   /bills/{id}/attachments:
+    post:
+      operationId: uploadBillAttachment
+      tags: [bills]
+      summary: Upload a file attachment for a bill (multipart/form-data)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  description: The file to upload (binary)
+              required: [file]
+      responses:
+        "201":
+          description: Attachment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillAttachment"
     get:
       operationId: listBillAttachments
       tags: [bills]
