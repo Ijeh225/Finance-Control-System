@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   useListBills, getListBillsQueryKey,
@@ -55,9 +55,11 @@ export default function BillsList() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
+  const rawSearch = useSearch();
+  const urlParams = new URLSearchParams(rawSearch);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [priorityFilter, setPriorityFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<string>(urlParams.get("status") ?? "all");
+  const [priorityFilter, setPriorityFilter] = useState<string>(urlParams.get("priority") ?? "all");
   const [showCreate, setShowCreate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -68,14 +70,14 @@ export default function BillsList() {
     amount: "",
     scheduledDate: "",
     dueDate: "",
-    walletId: "",
+    walletId: "none",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
     notes: "",
   });
 
   const queryParams = {
-    ...(statusFilter ? { status: statusFilter as any } : {}),
-    ...(priorityFilter ? { priority: priorityFilter as any } : {}),
+    ...(statusFilter && statusFilter !== "all" ? { status: statusFilter as any } : {}),
+    ...(priorityFilter && priorityFilter !== "all" ? { priority: priorityFilter as any } : {}),
     ...(user?.role !== "md" ? { userId: user?.id } : {}),
   };
 
@@ -99,7 +101,7 @@ export default function BillsList() {
     setShowCreate(false);
     setIsSubmitting(false);
     setPendingFile(null);
-    setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "", priority: "medium", notes: "" });
+    setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "none", priority: "medium", notes: "" });
     if (attachFileRef.current) attachFileRef.current.value = "";
   };
 
@@ -113,7 +115,7 @@ export default function BillsList() {
           amount: Number(form.amount),
           scheduledDate: form.scheduledDate,
           dueDate: form.dueDate || undefined,
-          walletId: form.walletId || undefined,
+          walletId: (form.walletId && form.walletId !== "none") ? form.walletId : undefined,
           priority: form.priority,
           createdBy: user!.id,
         },
@@ -188,7 +190,7 @@ export default function BillsList() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 {STATUSES.map(s => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -197,7 +199,7 @@ export default function BillsList() {
                 <SelectValue placeholder="All Priorities" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -319,7 +321,7 @@ export default function BillsList() {
                     <SelectValue placeholder="Select wallet (optional)..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No wallet specified</SelectItem>
+                    <SelectItem value="none">No wallet specified</SelectItem>
                     {walletsData.wallets.map(w => (
                       <SelectItem key={w.id} value={w.id}>{w.name} — {formatCurrency(w.balance ?? 0)}</SelectItem>
                     ))}

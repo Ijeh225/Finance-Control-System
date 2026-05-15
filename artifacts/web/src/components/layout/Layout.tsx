@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -20,13 +21,19 @@ interface NavItemProps {
   icon: ReactNode;
   label: string;
   isActive: boolean;
+  badge?: number;
 }
 
-function NavItem({ href, icon, label, isActive }: NavItemProps) {
+function NavItem({ href, icon, label, isActive, badge }: NavItemProps) {
   return (
     <Link href={href} className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'}`}>
-      <div className="w-5 h-5 flex items-center justify-center">
+      <div className="w-5 h-5 flex items-center justify-center relative">
         {icon}
+        {badge != null && badge > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-destructive text-destructive-foreground text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </div>
       <span>{label}</span>
     </Link>
@@ -36,6 +43,12 @@ function NavItem({ href, icon, label, isActive }: NavItemProps) {
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const { data: notifData } = useListNotifications(
+    { userId: user?.id ?? "" },
+    { query: { enabled: !!user?.id, queryKey: getListNotificationsQueryKey({ userId: user?.id ?? "" }) } }
+  );
+  const unreadCount = notifData?.unreadCount ?? 0;
 
   const handleLogout = async () => {
     await logout();
@@ -72,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavItem href="/bills" icon={<Receipt className="w-4 h-4" />} label="Bills & Approvals" isActive={location.startsWith("/bills")} />
           <NavItem href="/vendors" icon={<Users className="w-4 h-4" />} label="Vendors" isActive={location.startsWith("/vendors")} />
           <NavItem href="/wallets" icon={<Wallet className="w-4 h-4" />} label="Wallets" isActive={location.startsWith("/wallets")} />
-          <NavItem href="/notifications" icon={<Bell className="w-4 h-4" />} label="Notifications" isActive={location.startsWith("/notifications")} />
+          <NavItem href="/notifications" icon={<Bell className="w-4 h-4" />} label="Notifications" isActive={location.startsWith("/notifications")} badge={unreadCount} />
           <NavItem href="/reports" icon={<FileBarChart className="w-4 h-4" />} label="Reports" isActive={location.startsWith("/reports")} />
           
           {user?.role === 'md' && (

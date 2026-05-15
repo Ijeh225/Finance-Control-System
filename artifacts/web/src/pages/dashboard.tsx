@@ -83,49 +83,57 @@ export default function Dashboard() {
           ))
         ) : (
           <>
-            <Card className="shadow-sm border-primary/20 bg-primary/5" data-testid="card-pending-approval">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-primary">Pending Approval</CardTitle>
-                <Clock className="w-4 h-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-mono">{formatCurrency(summary.pendingApprovalAmount)}</div>
-                <p className="text-xs text-muted-foreground font-medium mt-1">{summary.pendingApprovalCount} bill{summary.pendingApprovalCount !== 1 ? "s" : ""} await action</p>
-              </CardContent>
-            </Card>
+            <Link href="/pending-approvals" className="block group" data-testid="card-pending-approval">
+              <Card className="shadow-sm border-primary/20 bg-primary/5 group-hover:border-primary/50 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-primary">Pending Approval</CardTitle>
+                  <Clock className="w-4 h-4 text-primary" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.pendingApprovalAmount)}</div>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">{summary.pendingApprovalCount} bill{summary.pendingApprovalCount !== 1 ? "s" : ""} await action</p>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card className="shadow-sm" data-testid="card-scheduled-today">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scheduled Today</CardTitle>
-                <CalendarClock className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-mono">{formatCurrency(summary.scheduledTodayAmount)}</div>
-                <p className="text-xs text-muted-foreground font-medium mt-1">{summary.scheduledTodayCount} payment{summary.scheduledTodayCount !== 1 ? "s" : ""} due</p>
-              </CardContent>
-            </Card>
+            <Link href="/scheduled-today" className="block group" data-testid="card-scheduled-today">
+              <Card className="shadow-sm group-hover:border-primary/30 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Scheduled Today</CardTitle>
+                  <CalendarClock className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.scheduledTodayAmount)}</div>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">{summary.scheduledTodayCount} payment{summary.scheduledTodayCount !== 1 ? "s" : ""} due</p>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card className="shadow-sm" data-testid="card-wallet-balance">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Wallet Funds</CardTitle>
-                <Wallet className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-mono">{formatCurrency(summary.totalWalletBalance ?? 0)}</div>
-                <p className="text-xs text-muted-foreground font-medium mt-1">Across all accounts</p>
-              </CardContent>
-            </Card>
+            <Link href="/wallets" className="block group" data-testid="card-wallet-balance">
+              <Card className="shadow-sm group-hover:border-primary/30 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Wallet Funds</CardTitle>
+                  <Wallet className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.totalWalletBalance ?? 0)}</div>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">Across all accounts</p>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card className="shadow-sm border-destructive/20 bg-destructive/5" data-testid="card-overdue">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-destructive">Overdue</CardTitle>
-                <AlertCircle className="w-4 h-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-mono">{formatCurrency(summary.overdueAmount)}</div>
-                <p className="text-xs text-muted-foreground font-medium mt-1">{summary.overdueCount} liabilit{summary.overdueCount !== 1 ? "ies" : "y"} past due</p>
-              </CardContent>
-            </Card>
+            <Link href="/overdue" className="block group" data-testid="card-overdue">
+              <Card className="shadow-sm border-destructive/20 bg-destructive/5 group-hover:border-destructive/50 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-destructive">Overdue</CardTitle>
+                  <AlertCircle className="w-4 h-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.overdueAmount)}</div>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">{summary.overdueCount} liabilit{summary.overdueCount !== 1 ? "ies" : "y"} past due</p>
+                </CardContent>
+              </Card>
+            </Link>
           </>
         )}
       </div>

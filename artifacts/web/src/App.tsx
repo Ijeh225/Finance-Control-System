@@ -21,6 +21,11 @@ import Audit from "@/pages/audit/index";
 import Settings from "@/pages/settings/index";
 import UsersList from "@/pages/users/index";
 import UserProfile from "@/pages/users/[id]";
+import PendingApprovals from "@/pages/pending-approvals/index";
+import ScheduledToday from "@/pages/scheduled-today/index";
+import ScheduledTomorrow from "@/pages/scheduled-tomorrow/index";
+import OverdueBills from "@/pages/overdue/index";
+import OutstandingLiabilities from "@/pages/outstanding/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -67,6 +72,11 @@ function AppRoutes() {
       <Route path="/users/:id" component={() => <ProtectedRoute component={UserProfile} />} />
       <Route path="/audit" component={() => <ProtectedRoute component={Audit} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
+      <Route path="/pending-approvals" component={() => <ProtectedRoute component={PendingApprovals} />} />
+      <Route path="/scheduled-today" component={() => <ProtectedRoute component={ScheduledToday} />} />
+      <Route path="/scheduled-tomorrow" component={() => <ProtectedRoute component={ScheduledTomorrow} />} />
+      <Route path="/overdue" component={() => <ProtectedRoute component={OverdueBills} />} />
+      <Route path="/outstanding" component={() => <ProtectedRoute component={OutstandingLiabilities} />} />
       <Route component={NotFound} />
     </Switch>
   );
