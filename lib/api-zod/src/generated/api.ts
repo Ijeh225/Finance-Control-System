@@ -498,6 +498,7 @@ export const UpdateBillParams = zod.object({
 })
 
 export const UpdateBillBody = zod.object({
+  "vendorId": zod.string().optional(),
   "description": zod.string().optional(),
   "amount": zod.number().optional(),
   "scheduledDate": zod.string().optional(),

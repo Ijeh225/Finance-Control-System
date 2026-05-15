@@ -14,6 +14,7 @@ import {
   useDeleteBillAttachment,
   useUpdateBill,
   useListWallets, getListWalletsQueryKey,
+  useListVendors, getListVendorsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
@@ -76,6 +77,7 @@ export default function BillDetail() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
+    vendorId: "",
     description: "",
     amount: "",
     scheduledDate: "",
@@ -98,6 +100,9 @@ export default function BillDetail() {
   });
   const { data: walletsData } = useListWallets(undefined, {
     query: { queryKey: getListWalletsQueryKey() },
+  });
+  const { data: vendorsData } = useListVendors(undefined, {
+    query: { queryKey: getListVendorsQueryKey() },
   });
 
   const invalidate = () => {
@@ -245,6 +250,7 @@ export default function BillDetail() {
 
   const openEditDialog = () => {
     setEditForm({
+      vendorId: bill.vendorId ?? "",
       description: bill.description ?? "",
       amount: String(bill.amount ?? ""),
       scheduledDate: bill.scheduledDate ?? "",
@@ -564,6 +570,19 @@ export default function BillDetail() {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-2">
             <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Vendor *</Label>
+              <Select value={editForm.vendorId} onValueChange={(v) => setEditForm(f => ({ ...f, vendorId: v }))}>
+                <SelectTrigger data-testid="select-edit-vendor">
+                  <SelectValue placeholder="Select vendor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendorsData?.vendors?.map(v => (
+                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 space-y-1.5">
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Description *</Label>
               <Input
                 value={editForm.description}
@@ -632,10 +651,11 @@ export default function BillDetail() {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowEdit(false)}>Cancel</Button>
             <Button
-              disabled={updateBill.isPending || !editForm.description.trim() || !editForm.amount || !editForm.scheduledDate}
+              disabled={updateBill.isPending || !editForm.vendorId || !editForm.description.trim() || !editForm.amount || !editForm.scheduledDate}
               onClick={() => updateBill.mutate({
                 id: id!,
                 data: {
+                  vendorId: editForm.vendorId,
                   description: editForm.description,
                   amount: Number(editForm.amount),
                   scheduledDate: editForm.scheduledDate,

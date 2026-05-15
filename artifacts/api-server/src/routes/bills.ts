@@ -140,8 +140,14 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
     res.status(403).json({ error: "You can only edit bills in pending status" }); return;
   }
 
-  const { description, amount, scheduledDate, dueDate, walletId, priority } = req.body;
+  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority } = req.body;
   const updates: Record<string, unknown> = {};
+  if (vendorId) {
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+    if (!vendor) { res.status(400).json({ error: "Vendor not found" }); return; }
+    updates["vendorId"] = vendorId;
+    updates["vendorName"] = vendor.name;
+  }
   if (description) updates["description"] = description;
   if (amount !== undefined) {
     const paidAmount = parseFloat(String(existing.paidAmount ?? 0));
@@ -154,8 +160,10 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
   if (walletId !== undefined) updates["walletId"] = walletId || null;
   if (priority) updates["priority"] = priority;
 
-  // Reset to pending if the bill was on hold so it re-enters the review queue
-  if (existing.status === "on_hold") updates["status"] = "pending";
+  // Re-enter the review queue when editing a held or overdue/escalated bill
+  if (existing.status === "on_hold" || existing.status === "overdue") {
+    updates["status"] = "pending";
+  }
 
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }

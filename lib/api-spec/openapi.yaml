@@ -1557,6 +1557,8 @@ components:
     UpdateBillInput:
       type: object
       properties:
+        vendorId:
+          type: string
         description:
           type: string
         amount:

@@ -222,6 +222,7 @@ export const UpdateBillInputPriority = {
 } as const;
 
 export interface UpdateBillInput {
+  vendorId?: string;
   description?: string;
   amount?: number;
   scheduledDate?: string;
