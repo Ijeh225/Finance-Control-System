@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -14,9 +14,9 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
 import { setBaseUrl } from "@workspace/api-client-react";
 import { UserProvider } from "@/context/UserContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 // Set base URL for API calls
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
@@ -26,24 +26,48 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === "login";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/login");
+    } else if (user && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [user, isLoading, segments]);
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ 
-      headerBackTitle: "Back",
-      headerStyle: { backgroundColor: "#0A0F1E" },
-      headerTintColor: "#C9A84C",
-      headerTitleStyle: { fontWeight: 'bold' }
-    }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="scheduled-today" options={{ title: "Scheduled Today" }} />
-      <Stack.Screen name="scheduled-tomorrow" options={{ title: "Tomorrow" }} />
-      <Stack.Screen name="pending-approvals" options={{ title: "Pending Approvals" }} />
-      <Stack.Screen name="overdue" options={{ title: "Overdue Bills" }} />
-      <Stack.Screen name="outstanding" options={{ title: "Outstanding" }} />
-      <Stack.Screen name="bill/[id]" options={{ title: "Bill Detail" }} />
-      <Stack.Screen name="vendor/[id]" options={{ title: "Vendor Profile" }} />
-      <Stack.Screen name="wallet/[id]" options={{ title: "Wallet Detail" }} />
-    </Stack>
+    <AuthGate>
+      <Stack
+        screenOptions={{
+          headerBackTitle: "Back",
+          headerStyle: { backgroundColor: "#0A0F1E" },
+          headerTintColor: "#C9A84C",
+          headerTitleStyle: { fontWeight: "bold" },
+        }}
+      >
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="scheduled-today" options={{ title: "Scheduled Today" }} />
+        <Stack.Screen name="scheduled-tomorrow" options={{ title: "Tomorrow" }} />
+        <Stack.Screen name="pending-approvals" options={{ title: "Pending Approvals" }} />
+        <Stack.Screen name="overdue" options={{ title: "Overdue Bills" }} />
+        <Stack.Screen name="outstanding" options={{ title: "Outstanding" }} />
+        <Stack.Screen name="bill/[id]" options={{ title: "Bill Detail" }} />
+        <Stack.Screen name="vendor/[id]" options={{ title: "Vendor Profile" }} />
+        <Stack.Screen name="wallet/[id]" options={{ title: "Wallet Detail" }} />
+      </Stack>
+    </AuthGate>
   );
 }
 
@@ -65,17 +89,19 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <UserProvider>
-        <ErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
-          </QueryClientProvider>
-        </ErrorBoundary>
-      </UserProvider>
+      <AuthProvider>
+        <UserProvider>
+          <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <GestureHandlerRootView>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </QueryClientProvider>
+          </ErrorBoundary>
+        </UserProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

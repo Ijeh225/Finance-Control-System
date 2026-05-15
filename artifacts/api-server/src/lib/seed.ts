@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -8,6 +9,7 @@ import {
   commentsTable,
   auditTable,
 } from "@workspace/db";
+import bcrypt from "bcryptjs";
 import { logger } from "./logger";
 
 function uid() {
@@ -17,9 +19,20 @@ function uid() {
 export async function seedIfEmpty() {
   try {
     const existing = await db.select().from(usersTable).limit(1);
-    if (existing.length > 0) return;
+    if (existing.length > 0) {
+      // Ensure all existing users have a passwordHash (e.g. after schema migration)
+      await ensurePasswords();
+      return;
+    }
 
     logger.info("Seeding database with demo data...");
+
+    const [mdHash, mrAHash, mrBHash, mrCHash] = await Promise.all([
+      bcrypt.hash("FinCommand2026!", 10),
+      bcrypt.hash("MrA@2026", 10),
+      bcrypt.hash("MrB@2026", 10),
+      bcrypt.hash("MrC@2026", 10),
+    ]);
 
     const mdId = uid();
     const mrAId = uid();
@@ -27,10 +40,10 @@ export async function seedIfEmpty() {
     const mrCId = uid();
 
     await db.insert(usersTable).values([
-      { id: mdId, name: "MD — Chief Executive", role: "md", email: "md@fincommand.ng", phone: "+234 800 000 0001" },
-      { id: mrAId, name: "Mr A (Treasury)", role: "treasury", email: "mra@fincommand.ng", phone: "+234 800 000 0002" },
-      { id: mrBId, name: "Mr B (Payments)", role: "payment_assistant", email: "mrb@fincommand.ng", phone: "+234 800 000 0003" },
-      { id: mrCId, name: "Mr C (Payments)", role: "payment_assistant", email: "mrc@fincommand.ng", phone: "+234 800 000 0004" },
+      { id: mdId, name: "MD — Chief Executive", role: "md", email: "md@fincommand.ng", phone: "+234 800 000 0001", passwordHash: mdHash },
+      { id: mrAId, name: "Mr A (Treasury)", role: "treasury", email: "mra@fincommand.ng", phone: "+234 800 000 0002", passwordHash: mrAHash },
+      { id: mrBId, name: "Mr B (Payments)", role: "payment_assistant", email: "mrb@fincommand.ng", phone: "+234 800 000 0003", passwordHash: mrBHash },
+      { id: mrCId, name: "Mr C (Payments)", role: "payment_assistant", email: "mrc@fincommand.ng", phone: "+234 800 000 0004", passwordHash: mrCHash },
     ]);
 
     const v1Id = uid(); const v2Id = uid(); const v3Id = uid();
@@ -95,5 +108,25 @@ export async function seedIfEmpty() {
     logger.info("Seeding complete.");
   } catch (err) {
     logger.error({ err }, "Seeding failed");
+  }
+}
+
+async function ensurePasswords() {
+  const users = await db.select().from(usersTable);
+  const defaults: Record<string, string> = {
+    "md@fincommand.ng": "FinCommand2026!",
+    "mra@fincommand.ng": "MrA@2026",
+    "mrb@fincommand.ng": "MrB@2026",
+    "mrc@fincommand.ng": "MrC@2026",
+  };
+
+  for (const user of users) {
+    if (!user.passwordHash && user.email && defaults[user.email]) {
+      const hash = await bcrypt.hash(defaults[user.email]!, 10);
+      await db.update(usersTable).set({ passwordHash: hash }).where(
+        eq(usersTable.id, user.id)
+      );
+      logger.info({ email: user.email }, "Set initial password for existing user");
+    }
   }
 }

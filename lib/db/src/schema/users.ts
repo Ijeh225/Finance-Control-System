@@ -8,6 +8,7 @@ export const usersTable = pgTable("users", {
   role: text("role", { enum: ["md", "treasury", "payment_assistant"] }).notNull().default("payment_assistant"),
   email: text("email"),
   phone: text("phone"),
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useListUsers } from '@workspace/api-client-react';
 import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText } from '@/components/finance/AmountText';
 import { router } from 'expo-router';
@@ -11,8 +12,19 @@ import { router } from 'expo-router';
 export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { userId, setUserId } = useUser();
+  const { userId, setUserId, isMD } = useUser();
+  const { user, logout } = useAuth();
   const [isUserSwitcherVisible, setIsUserSwitcherVisible] = useState(false);
+
+  function handleSignOut() {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out', style: 'destructive',
+        onPress: async () => { await logout(); router.replace('/login'); },
+      },
+    ]);
+  }
 
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(
     { userId: userId === 'all' ? undefined : userId },
@@ -37,23 +49,32 @@ export default function DashboardScreen() {
     <View style={[styles.header, { paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
       <View>
         <Text style={[styles.appName, { color: colors.primary }]}>FinCommand</Text>
-        <Pressable 
-          style={styles.userSwitcher} 
-          onPress={() => setIsUserSwitcherVisible(!isUserSwitcherVisible)}
-        >
-          <Text style={[styles.userName, { color: colors.foreground }]}>
-            {userId === 'all' ? 'All Users' : usersData?.users.find(u => u.id === userId)?.name || userId} ▼
-          </Text>
+        {isMD ? (
+          <Pressable
+            style={styles.userSwitcher}
+            onPress={() => setIsUserSwitcherVisible(!isUserSwitcherVisible)}
+          >
+            <Text style={[styles.userName, { color: colors.foreground }]}>
+              {userId === 'all' ? 'All Users' : usersData?.users.find(u => u.id === userId)?.name || userId} ▼
+            </Text>
+          </Pressable>
+        ) : (
+          <Text style={[styles.userName, { color: colors.mutedForeground }]}>{user?.name}</Text>
+        )}
+      </View>
+      <View style={styles.headerActions}>
+        <Pressable style={styles.notificationBtn} onPress={() => router.push('/(tabs)/alerts')}>
+          <Feather name="bell" size={22} color={colors.foreground} />
+          {summary?.unreadNotificationsCount ? (
+            <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
+              <Text style={styles.badgeText}>{summary.unreadNotificationsCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+        <Pressable style={styles.notificationBtn} onPress={handleSignOut}>
+          <Feather name="log-out" size={20} color={colors.mutedForeground} />
         </Pressable>
       </View>
-      <Pressable style={styles.notificationBtn} onPress={() => router.push('/(tabs)/alerts')}>
-        <Feather name="bell" size={24} color={colors.foreground} />
-        {summary?.unreadNotificationsCount ? (
-          <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
-            <Text style={styles.badgeText}>{summary.unreadNotificationsCount}</Text>
-          </View>
-        ) : null}
-      </Pressable>
     </View>
   );
 
@@ -166,6 +187,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   notificationBtn: {
     padding: 8,
