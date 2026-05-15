@@ -12,6 +12,8 @@ import {
   useRequestBillAttachmentUpload,
   useConfirmBillAttachment,
   useDeleteBillAttachment,
+  useUpdateBill,
+  useListWallets, getListWalletsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
@@ -21,10 +23,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpCircle,
   ChevronLeft, MessageSquare, Activity, User, Send,
-  Paperclip, Upload, Download, Trash2, FileText,
+  Paperclip, Upload, Download, Trash2, FileText, Pencil,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -69,6 +74,16 @@ export default function BillDetail() {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    description: "",
+    amount: "",
+    scheduledDate: "",
+    dueDate: "",
+    walletId: "",
+    priority: "medium" as "low" | "medium" | "high" | "urgent",
+  });
+
   const { data: bill, isLoading: billLoading } = useGetBill(id!, {
     query: { enabled: !!id, queryKey: getGetBillQueryKey(id!) },
   });
@@ -80,6 +95,9 @@ export default function BillDetail() {
   });
   const { data: attachmentsData, isLoading: attachmentsLoading } = useListBillAttachments(id!, {
     query: { enabled: !!id, queryKey: getListBillAttachmentsQueryKey(id!) },
+  });
+  const { data: walletsData } = useListWallets(undefined, {
+    query: { queryKey: getListWalletsQueryKey() },
   });
 
   const invalidate = () => {
@@ -119,6 +137,17 @@ export default function BillDetail() {
       onError: () => toast({ title: "Failed to escalate bill", variant: "destructive" }),
     },
   });
+  const updateBill = useUpdateBill({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        setShowEdit(false);
+        toast({ title: "Bill updated" });
+      },
+      onError: () => toast({ title: "Failed to update bill", variant: "destructive" }),
+    },
+  });
+
   const addComment = useAddBillComment({
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getGetBillCommentsQueryKey(id!) }); setComment(""); },
@@ -209,7 +238,22 @@ export default function BillDetail() {
 
   const isMd = user?.role === "md";
   const canAct = isMd && ["pending", "on_hold", "partial", "overdue"].includes(bill.status ?? "");
+  const canEdit = isMd
+    ? !["approved", "paid"].includes(bill.status ?? "")
+    : bill.status === "pending" && bill.createdBy === user?.id;
   const attachments = attachmentsData?.attachments ?? [];
+
+  const openEditDialog = () => {
+    setEditForm({
+      description: bill.description ?? "",
+      amount: String(bill.amount ?? ""),
+      scheduledDate: bill.scheduledDate ?? "",
+      dueDate: bill.dueDate ?? "",
+      walletId: bill.walletId ?? "",
+      priority: (bill.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
+    });
+    setShowEdit(true);
+  };
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
@@ -227,6 +271,11 @@ export default function BillDetail() {
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded border ${PRIORITY_COLORS[bill.priority ?? "low"]}`}>{bill.priority}</span>
           <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded border ${STATUS_COLORS[bill.status ?? "pending"]}`} data-testid="status-bill">{bill.status?.replace("_", " ")}</span>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={openEditDialog} data-testid="button-edit-bill">
+              <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+            </Button>
+          )}
         </div>
       </div>
 
@@ -507,6 +556,101 @@ export default function BillDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Bill</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Description *</Label>
+              <Input
+                value={editForm.description}
+                onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Invoice #1234 — Q1 supplies"
+                data-testid="input-edit-description"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
+              <Input
+                type="number"
+                value={editForm.amount}
+                onChange={(e) => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+                className="font-mono"
+                data-testid="input-edit-amount"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Priority *</Label>
+              <Select value={editForm.priority} onValueChange={(v) => setEditForm(f => ({ ...f, priority: v as typeof editForm.priority }))}>
+                <SelectTrigger data-testid="select-edit-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["low", "medium", "high", "urgent"] as const).map(p => (
+                    <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Scheduled Date *</Label>
+              <Input
+                type="date"
+                value={editForm.scheduledDate}
+                onChange={(e) => setEditForm(f => ({ ...f, scheduledDate: e.target.value }))}
+                data-testid="input-edit-scheduled-date"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Due Date</Label>
+              <Input
+                type="date"
+                value={editForm.dueDate}
+                onChange={(e) => setEditForm(f => ({ ...f, dueDate: e.target.value }))}
+                data-testid="input-edit-due-date"
+              />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Wallet / Account</Label>
+              <Select value={editForm.walletId || "_none"} onValueChange={(v) => setEditForm(f => ({ ...f, walletId: v === "_none" ? "" : v }))}>
+                <SelectTrigger data-testid="select-edit-wallet">
+                  <SelectValue placeholder="Select wallet (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No wallet</SelectItem>
+                  {walletsData?.wallets?.map(w => (
+                    <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEdit(false)}>Cancel</Button>
+            <Button
+              disabled={updateBill.isPending || !editForm.description.trim() || !editForm.amount || !editForm.scheduledDate}
+              onClick={() => updateBill.mutate({
+                id: id!,
+                data: {
+                  description: editForm.description,
+                  amount: Number(editForm.amount),
+                  scheduledDate: editForm.scheduledDate,
+                  dueDate: editForm.dueDate || undefined,
+                  walletId: editForm.walletId || undefined,
+                  priority: editForm.priority,
+                },
+              })}
+              data-testid="button-confirm-edit"
+            >
+              {updateBill.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

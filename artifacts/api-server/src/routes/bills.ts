@@ -131,17 +131,36 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
   if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  // Approved and paid bills cannot be edited
+  if (["approved", "paid"].includes(existing.status)) {
+    res.status(400).json({ error: `Cannot edit a bill with status '${existing.status}'` }); return;
+  }
+  // Non-MD users may only edit their own pending bills
+  if (actor.role !== "md" && existing.status !== "pending") {
+    res.status(403).json({ error: "You can only edit bills in pending status" }); return;
+  }
+
   const { description, amount, scheduledDate, dueDate, walletId, priority } = req.body;
   const updates: Record<string, unknown> = {};
   if (description) updates["description"] = description;
-  if (amount !== undefined) { updates["amount"] = String(amount); updates["outstandingBalance"] = String(amount); }
+  if (amount !== undefined) {
+    const paidAmount = parseFloat(String(existing.paidAmount ?? 0));
+    const newAmount = parseFloat(String(amount));
+    updates["amount"] = String(newAmount);
+    updates["outstandingBalance"] = String(Math.max(0, newAmount - paidAmount));
+  }
   if (scheduledDate) updates["scheduledDate"] = scheduledDate;
-  if (dueDate) updates["dueDate"] = dueDate;
-  if (walletId) updates["walletId"] = walletId;
+  if (dueDate !== undefined) updates["dueDate"] = dueDate || null;
+  if (walletId !== undefined) updates["walletId"] = walletId || null;
   if (priority) updates["priority"] = priority;
+
+  // Reset to pending if the bill was on hold so it re-enters the review queue
+  if (existing.status === "on_hold") updates["status"] = "pending";
 
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  await addAudit(rawId!, actor.id, actor.name, "edited", "Bill details updated");
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
