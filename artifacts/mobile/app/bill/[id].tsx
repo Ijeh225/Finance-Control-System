@@ -128,7 +128,7 @@ export default function BillDetailScreen() {
       if (!asset) return;
 
       const mimeType = asset.mimeType ?? 'application/octet-stream';
-      const fileSize = asset.size ?? 0;
+      const fileSize = asset.size ?? null;
       const fileName = asset.name;
 
       if (!ALLOWED_MIME_TYPES.has(mimeType)) {
@@ -136,7 +136,7 @@ export default function BillDetailScreen() {
         return;
       }
 
-      if (fileSize > MAX_FILE_SIZE) {
+      if (fileSize !== null && fileSize > MAX_FILE_SIZE) {
         Alert.alert('File Too Large', 'The file must be smaller than 20 MB.');
         return;
       }
@@ -146,7 +146,7 @@ export default function BillDetailScreen() {
       // Step 1: request presigned upload URL
       const uploadResp = await requestUploadMutation.mutateAsync({
         id: billId,
-        data: { fileName, fileSize, mimeType },
+        data: { fileName, fileSize: fileSize ?? undefined, mimeType },
       });
 
       const { attachmentId, uploadUrl } = uploadResp;
@@ -185,24 +185,18 @@ export default function BillDetailScreen() {
   const handleDownload = async (attachmentId: string, fileName: string) => {
     try {
       const url = `${API_BASE}/api/attachments/${attachmentId}/download`;
-      const response = await fetch(url, { credentials: 'include' });
-      if (!response.ok) {
+      const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const localPath = (FileSystem.cacheDirectory ?? '') + safeFileName;
+      // downloadAsync uses the native HTTP client which shares the session cookie jar
+      const result = await FileSystem.downloadAsync(url, localPath);
+      if (result.status !== 200) {
         Alert.alert('Download Failed', 'Could not download the file. Please try again.');
         return;
       }
-      const arrayBuffer = await response.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = '';
-      uint8Array.forEach(byte => { binary += String.fromCharCode(byte); });
-      const base64 = btoa(binary);
-      const localPath = (FileSystem.cacheDirectory ?? '') + fileName;
-      await FileSystem.writeAsStringAsync(localPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(localPath);
+        await Sharing.shareAsync(result.uri);
       } else {
-        Alert.alert('Download Saved', `File saved: ${fileName}`);
+        Alert.alert('Downloaded', `${fileName} saved to device.`);
       }
     } catch {
       Alert.alert('Download Failed', 'Could not download the file. Please try again.');
