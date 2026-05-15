@@ -176,6 +176,16 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
       relatedWalletName: fromWallet.name,
     }).returning();
 
+    // Audit insert is inside the transaction so it either commits with the
+    // transfer or rolls back entirely — no partial-success risk.
+    await tx.insert(auditTable).values({
+      id: uid(),
+      userId: actor.id,
+      userName: actor.name,
+      action: "transfer",
+      details: `₦${transferAmount.toLocaleString("en-NG")} from ${fromWallet.name} → ${toWallet.name}: ${narration}`,
+    });
+
     return { ok: true, from: updatedFrom, to: updatedTo, debitTx, creditTx };
   });
 
@@ -183,15 +193,6 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     res.status(result.status).json({ error: result.error });
     return;
   }
-
-  // Audit outside the transaction (best-effort; not worth aborting the transfer)
-  await db.insert(auditTable).values({
-    id: uid(),
-    userId: actor.id,
-    userName: actor.name,
-    action: "transfer",
-    details: `₦${transferAmount.toLocaleString("en-NG")} from ${result.from.name} → ${result.to.name}: ${narration}`,
-  }).catch(() => undefined);
 
   res.json({
     from: fmtWallet(result.from),
@@ -322,7 +323,7 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
         initiatedByName: actor.name,
         relatedWalletId: null,
         relatedWalletName: null,
-      }).catch(() => undefined);
+      });
     }
   }
 
