@@ -5,7 +5,7 @@ import {
   useGetBill, getGetBillQueryKey,
   useGetBillComments, getGetBillCommentsQueryKey,
   useGetBillAudit, getGetBillAuditQueryKey,
-  useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill,
+  useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill, useWithdrawBill,
   useAddBillComment,
   getListBillsQueryKey,
   useListBillAttachments, getListBillAttachmentsQueryKey,
@@ -142,6 +142,12 @@ export default function BillDetail() {
       onError: () => toast({ title: "Failed to escalate bill", variant: "destructive" }),
     },
   });
+  const withdraw = useWithdrawBill({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getListBillsQueryKey() }); toast({ title: "Bill withdrawn" }); setLocation("/bills"); },
+      onError: () => toast({ title: "Failed to withdraw bill", variant: "destructive" }),
+    },
+  });
   const updateBill = useUpdateBill({
     mutation: {
       onSuccess: () => {
@@ -246,6 +252,7 @@ export default function BillDetail() {
   const canEdit = isMd
     ? !["approved", "paid"].includes(bill.status ?? "")
     : bill.status === "pending" && bill.createdBy === user?.id;
+  const canWithdraw = !isMd && bill.status === "pending" && bill.createdBy === user?.id;
   const attachments = attachmentsData?.attachments ?? [];
 
   const openEditDialog = () => {
@@ -280,6 +287,22 @@ export default function BillDetail() {
           {canEdit && (
             <Button size="sm" variant="outline" onClick={openEditDialog} data-testid="button-edit-bill">
               <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+            </Button>
+          )}
+          {canWithdraw && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={withdraw.isPending}
+              data-testid="button-withdraw-bill"
+              onClick={() => {
+                if (window.confirm("This will permanently delete the bill and cannot be undone. Withdraw?")) {
+                  withdraw.mutate({ id: id! });
+                }
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              {withdraw.isPending ? "Withdrawing…" : "Withdraw"}
             </Button>
           )}
         </div>

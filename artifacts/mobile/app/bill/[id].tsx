@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform, Pressable, Alert } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform,
+  Pressable, Alert, Modal, TextInput, KeyboardAvoidingView,
+} from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   useGetBill,
   getGetBillQueryKey,
@@ -16,6 +19,8 @@ import {
   getListBillAttachmentsQueryKey,
   useRequestBillAttachmentUpload,
   useConfirmBillAttachment,
+  useWithdrawBill,
+  useUpdateBill,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,14 +68,35 @@ const ACTION_LABELS: Record<string, string> = {
   comment: 'Comment added',
 };
 
+const ACTION_ERRORS: Record<string, string> = {
+  approve: 'Could not approve the bill. Please try again.',
+  partial: 'Could not record the partial approval. Please try again.',
+  reject: 'Could not reject the bill. Please try again.',
+  hold: 'Could not place the bill on hold. Please try again.',
+  escalate: 'Could not escalate the bill. Please try again.',
+  comment: 'Could not add the comment. Please check your connection.',
+};
+
+type Priority = 'low' | 'medium' | 'high' | 'urgent';
+
 export default function BillDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const { user: authUser } = useAuth();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [isEditVisible, setIsEditVisible] = useState(false);
+  const [editForm, setEditForm] = useState({
+    description: '',
+    amount: '',
+    scheduledDate: '',
+    dueDate: '',
+    priority: 'medium' as Priority,
+  });
 
   const billId = id as string;
 
@@ -93,10 +119,82 @@ export default function BillDetailScreen() {
   const partialMutation = usePartialApproveBill();
   const commentMutation = useAddBillComment();
   const escalateMutation = useEscalateBill();
+  const withdrawMutation = useWithdrawBill();
+  const updateMutation = useUpdateBill();
 
   const isMd = authUser?.role === 'md';
   const canAttach = authUser?.role === 'md' || authUser?.role === 'payment_assistant';
   const attachments = attachmentsData?.attachments ?? [];
+  const canWithdraw = !isMd && bill?.status === 'pending' && bill?.createdBy === authUser?.id;
+  const canEdit = isMd
+    ? bill != null && !['approved', 'paid'].includes(bill.status ?? '')
+    : bill?.status === 'pending' && bill?.createdBy === authUser?.id;
+
+  const openEdit = () => {
+    if (!bill) return;
+    setEditForm({
+      description: bill.description ?? '',
+      amount: String(bill.amount ?? ''),
+      scheduledDate: bill.scheduledDate ?? '',
+      dueDate: bill.dueDate ?? '',
+      priority: (bill.priority as Priority) ?? 'medium',
+    });
+    setIsEditVisible(true);
+  };
+
+  const handleWithdraw = () => {
+    Alert.alert(
+      'Withdraw Bill',
+      'This will permanently delete the bill. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await withdrawMutation.mutateAsync({ id: billId });
+              await queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
+              Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+            } catch {
+              Alert.alert('Withdraw Failed', 'Could not withdraw the bill. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditSave = async () => {
+    if (!billId) return;
+    const parsedAmount = parseFloat(editForm.amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid positive amount.');
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        id: billId,
+        data: {
+          description: editForm.description || undefined,
+          amount: parsedAmount,
+          scheduledDate: editForm.scheduledDate || undefined,
+          dueDate: editForm.dueDate || undefined,
+          priority: editForm.priority,
+        },
+      });
+      await Promise.all([
+        refetch(),
+        queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() }),
+      ]);
+      setIsEditVisible(false);
+      Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Saved', 'Bill updated successfully.');
+    } catch {
+      Alert.alert('Update Failed', 'Could not save changes. Please try again.');
+    }
+  };
 
   const actionOptions: ActionOption[] = [
     { id: 'approve', label: 'Approve', icon: 'check-circle', color: colors.success },
@@ -151,19 +249,29 @@ export default function BillDetailScreen() {
 
       const { attachmentId, uploadUrl } = uploadResp;
 
-      // Step 2: fetch file as blob and PUT to presigned URL
+      // Step 2: fetch file as blob and PUT to presigned URL with progress tracking
       const fileRes = await fetch(asset.uri);
       const blob = await fileRes.blob();
 
-      const putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': mimeType },
-        body: blob,
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', mimeType);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Storage upload failed: ${xhr.status}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(blob);
       });
-
-      if (!putRes.ok) {
-        throw new Error(`Storage upload failed: ${putRes.status}`);
-      }
 
       // Step 3: confirm the upload
       await confirmMutation.mutateAsync({ id: billId, attachmentId });
@@ -179,6 +287,7 @@ export default function BillDetailScreen() {
       Alert.alert('Upload Failed', 'Could not upload the file. Please try again.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -233,7 +342,7 @@ export default function BillDetailScreen() {
 
       Alert.alert('Done', ACTION_LABELS[actionId] ?? 'Action completed.');
     } catch {
-      Alert.alert('Action Failed', 'Could not complete the action. Please check your connection and try again.');
+      Alert.alert('Action Failed', ACTION_ERRORS[actionId] ?? 'Could not complete the action. Please check your connection and try again.');
     }
   };
 
@@ -256,6 +365,29 @@ export default function BillDetailScreen() {
             <StatusBadge status={bill.status} />
             <PriorityBadge priority={bill.priority} />
           </View>
+          {(canEdit || canWithdraw) && (
+            <View style={styles.creatorActions}>
+              {canEdit && (
+                <Pressable
+                  style={[styles.creatorActionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={openEdit}
+                >
+                  <Text style={[styles.creatorActionText, { color: colors.primary }]}>Edit</Text>
+                </Pressable>
+              )}
+              {canWithdraw && (
+                <Pressable
+                  style={[styles.creatorActionBtn, { backgroundColor: '#1f0a0a', borderColor: '#7f1d1d' }]}
+                  onPress={handleWithdraw}
+                  disabled={withdrawMutation.isPending}
+                >
+                  <Text style={[styles.creatorActionText, { color: '#f87171' }]}>
+                    {withdrawMutation.isPending ? 'Withdrawing…' : 'Withdraw'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -305,6 +437,14 @@ export default function BillDetailScreen() {
               </Pressable>
             )}
           </View>
+          {isUploading && uploadProgress !== null && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${uploadProgress}%` as `${number}%`, backgroundColor: colors.primary }]} />
+              </View>
+              <Text style={[styles.progressLabel, { color: colors.mutedForeground }]}>{uploadProgress}%</Text>
+            </View>
+          )}
 
           {attachments.length === 0 ? (
             <View style={[styles.emptyAttachments, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -374,6 +514,98 @@ export default function BillDetailScreen() {
           </View>
         ))}
       </ScrollView>
+
+      {/* Edit Bill Modal */}
+      <Modal visible={isEditVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsEditVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Edit Bill</Text>
+              <Pressable onPress={() => setIsEditVisible(false)}>
+                <Text style={[styles.modalCancel, { color: colors.mutedForeground }]}>Cancel</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.modalBody} contentContainerStyle={{ gap: 16 }}>
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Description</Text>
+                <TextInput
+                  style={[styles.fieldInput, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]}
+                  value={editForm.description}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, description: v }))}
+                  placeholder="Bill description"
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Amount (NGN)</Text>
+                <TextInput
+                  style={[styles.fieldInput, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]}
+                  value={editForm.amount}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, amount: v }))}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Scheduled Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={[styles.fieldInput, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]}
+                  value={editForm.scheduledDate}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, scheduledDate: v }))}
+                  placeholder="2026-01-15"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Due Date (YYYY-MM-DD, optional)</Text>
+                <TextInput
+                  style={[styles.fieldInput, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]}
+                  value={editForm.dueDate}
+                  onChangeText={(v) => setEditForm((f) => ({ ...f, dueDate: v }))}
+                  placeholder="2026-01-30"
+                  placeholderTextColor={colors.mutedForeground}
+                />
+              </View>
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Priority</Text>
+                <View style={styles.priorityRow}>
+                  {(['low', 'medium', 'high', 'urgent'] as Priority[]).map((p) => (
+                    <Pressable
+                      key={p}
+                      style={[
+                        styles.priorityChip,
+                        { borderColor: colors.border, backgroundColor: colors.card },
+                        editForm.priority === p && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                      onPress={() => setEditForm((f) => ({ ...f, priority: p }))}
+                    >
+                      <Text style={[
+                        styles.priorityChipText,
+                        { color: editForm.priority === p ? colors.primaryForeground : colors.foreground },
+                      ]}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+            <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+              <Pressable
+                style={[styles.saveBtn, { backgroundColor: colors.primary }, updateMutation.isPending && { opacity: 0.7 }]}
+                onPress={handleEditSave}
+                disabled={updateMutation.isPending}
+              >
+                <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>
+                  {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {isMd && (
         <>
@@ -584,6 +816,112 @@ const styles = StyleSheet.create({
   },
   mainActionText: {
     fontSize: 18,
+    fontWeight: '800',
+  },
+  creatorActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  creatorActionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  creatorActionText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 24,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  modalCancel: {
+    fontSize: 16,
+  },
+  modalBody: {
+    flex: 1,
+    padding: 20,
+  },
+  modalFooter: {
+    padding: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  fieldInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 44,
+  },
+  priorityRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  priorityChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  priorityChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    padding: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 16,
     fontWeight: '800',
   },
 });

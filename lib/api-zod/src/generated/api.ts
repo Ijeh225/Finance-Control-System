@@ -712,6 +712,18 @@ export const EscalateBillResponse = zod.object({
 
 
 /**
+ * @summary Withdraw a pending bill (creator only)
+ */
+export const WithdrawBillParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const WithdrawBillResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
  * @summary Request a presigned URL to upload a file attachment for a bill
  */
 export const RequestBillAttachmentUploadParams = zod.object({

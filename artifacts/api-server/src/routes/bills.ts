@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable } from "@workspace/db";
+import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -247,6 +247,28 @@ router.post("/bills/:id/escalate", async (req, res): Promise<void> => {
   await addAudit(rawId!, actor.id, actor.name, "escalated", comment ?? "Bill escalated to urgent");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   res.json(formatBill(bill as unknown as Record<string, unknown>));
+});
+
+// ─── Withdraw ────────────────────────────────────────────────────────────────
+
+router.post("/bills/:id/withdraw", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (actor.id !== bill.createdBy) {
+    res.status(403).json({ error: "Only the bill creator can withdraw it" }); return;
+  }
+  if (bill.status !== "pending") {
+    res.status(400).json({ error: "Only pending bills can be withdrawn" }); return;
+  }
+  await db.delete(commentsTable).where(eq(commentsTable.billId, rawId!));
+  await db.delete(auditTable).where(eq(auditTable.billId, rawId!));
+  await db.delete(billAttachmentsTable).where(eq(billAttachmentsTable.billId, rawId!));
+  await db.delete(billsTable).where(eq(billsTable.id, rawId!));
+  req.log.info({ billId: rawId, actor: actor.id }, "Bill withdrawn");
+  res.json({ success: true });
 });
 
 // ─── Comments ─────────────────────────────────────────────────────────────────

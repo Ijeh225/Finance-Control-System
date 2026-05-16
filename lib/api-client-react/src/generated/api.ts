@@ -93,7 +93,8 @@ import type {
   VendorDetail,
   Wallet,
   WalletDetail,
-  WalletStatement
+  WalletStatement,
+  WithdrawBill200
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1788,6 +1789,76 @@ export const useEscalateBill = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getEscalateBillMutationOptions(options));
+    }
+
+export const getWithdrawBillUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/withdraw`
+}
+
+/**
+ * @summary Withdraw a pending bill (creator only)
+ */
+export const withdrawBill = async (id: string, options?: RequestInit): Promise<WithdrawBill200> => {
+
+  return customFetch<WithdrawBill200>(getWithdrawBillUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getWithdrawBillMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawBill>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof withdrawBill>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['withdrawBill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof withdrawBill>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  withdrawBill(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WithdrawBillMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawBill>>>
+
+    export type WithdrawBillMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Withdraw a pending bill (creator only)
+ */
+export const useWithdrawBill = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawBill>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof withdrawBill>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getWithdrawBillMutationOptions(options));
     }
 
 export const getRequestBillAttachmentUploadUrl = (id: string,) => {

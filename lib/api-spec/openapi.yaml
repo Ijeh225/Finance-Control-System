@@ -566,6 +566,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/Bill"
 
+  /bills/{id}/withdraw:
+    post:
+      operationId: withdrawBill
+      tags: [bills]
+      summary: Withdraw a pending bill (creator only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill withdrawn and deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
   # ─── ATTACHMENTS ──────────────────────────────────────────────
   /bills/{id}/attachments/request-upload:
     post:

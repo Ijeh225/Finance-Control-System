@@ -4,12 +4,19 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
+import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
 
 export default function TabLayout() {
   const colors = useColors();
   const { user } = useAuth();
   const isWeb = Platform.OS === "web";
   const isMd = user?.role === "md";
+  const userId = user?.id ?? "";
+  const { data: notifData } = useListNotifications(
+    { userId },
+    { query: { enabled: !!userId, queryKey: getListNotificationsQueryKey({ userId }), refetchInterval: 30_000 } }
+  );
+  const unreadCount = notifData?.unreadCount ?? 0;
 
   return (
     <Tabs
@@ -60,6 +67,7 @@ export default function TabLayout() {
         name="alerts"
         options={{
           title: "Alerts",
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarIcon: ({ color }) => (
             <View>
               <Feather name="bell" size={24} color={color} />

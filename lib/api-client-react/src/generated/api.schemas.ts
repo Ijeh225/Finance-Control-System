@@ -521,6 +521,10 @@ export type EscalateBillBody = {
   comment?: string;
 };
 
+export type WithdrawBill200 = {
+  success?: boolean;
+};
+
 export type ConfirmBillAttachment200 = {
   ok: boolean;
 };

@@ -11,7 +11,7 @@ import {
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, Tabs } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AlertsScreen() {
@@ -73,12 +73,6 @@ export default function AlertsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 67 : insets.top }]}>
-      <Tabs.Screen
-        options={{
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-        }}
-      />
-
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.foreground }]}>Alerts</Text>
         {unreadCount > 0 && (
