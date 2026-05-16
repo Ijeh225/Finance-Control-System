@@ -90,6 +90,7 @@ export interface Wallet {
   balance: number;
   currency: string;
   isLow?: boolean;
+  lowBalanceThreshold?: number | null;
   ownedBy?: string;
   ownedByName?: string;
   createdAt: string;
@@ -263,6 +264,7 @@ export const WalletTransactionType = {
   debit: 'debit',
   transfer_in: 'transfer_in',
   transfer_out: 'transfer_out',
+  bill_payment: 'bill_payment',
 } as const;
 
 export interface WalletTransaction {
@@ -277,6 +279,7 @@ export interface WalletTransaction {
   initiatedByName: string;
   relatedWalletId?: string | null;
   relatedWalletName?: string | null;
+  relatedBillId?: string | null;
   createdAt: string;
 }
 
@@ -306,6 +309,7 @@ export interface CreateWalletInput {
   balance: number;
   currency: string;
   ownedBy?: string;
+  lowBalanceThreshold?: number | null;
 }
 
 export type NotificationType = typeof NotificationType[keyof typeof NotificationType];

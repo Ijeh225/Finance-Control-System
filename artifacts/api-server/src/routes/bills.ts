@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable } from "@workspace/db";
+import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -181,10 +181,28 @@ router.post("/bills/:id/approve", async (req, res): Promise<void> => {
   const { comment, approvedAmount } = req.body ?? {};
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
-  const [bill] = await db.update(billsTable).set({ status: "approved", approvedAmount: approvedAmount ? String(approvedAmount) : String(existing.amount) }).where(eq(billsTable.id, rawId!)).returning();
+  const debitAmount = approvedAmount ? parseFloat(String(approvedAmount)) : parseFloat(String(existing.amount));
+  const [bill] = await db.update(billsTable).set({ status: "approved", approvedAmount: String(debitAmount) }).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "approved", comment ?? "Bill approved");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_approved", "Bill Approved", `Your bill for ${existing.vendorName} has been approved.`, rawId!);
+
+  if (existing.walletId) {
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, existing.walletId));
+    if (wallet) {
+      const prevBalance = parseFloat(String(wallet.balance));
+      const newBalance = prevBalance - debitAmount;
+      await db.update(walletsTable).set({ balance: String(newBalance) }).where(eq(walletsTable.id, wallet.id));
+      await db.insert(walletTransactionsTable).values({
+        id: uid(), walletId: wallet.id, type: "bill_payment",
+        amount: String(debitAmount), balanceBefore: String(prevBalance), balanceAfter: String(newBalance),
+        narration: `Bill payment: ${existing.vendorName}`,
+        initiatedBy: actor.id, initiatedByName: actor.name,
+        relatedWalletId: null, relatedWalletName: null, relatedBillId: rawId!,
+      });
+    }
+  }
+
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -231,6 +249,24 @@ router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   await addAudit(rawId!, actor.id, actor.name, "partial_approved", comment ?? `Partial payment approved: ${approvedAmount}`, String(existing.amount), String(approvedAmount));
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
   await notify(existing.createdBy, "bill_partial", "Partial Approval", `Your bill for ${existing.vendorName} has been partially approved.`, rawId!);
+
+  if (existing.walletId) {
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, existing.walletId));
+    if (wallet) {
+      const prevBalance = parseFloat(String(wallet.balance));
+      const debitAmount = parseFloat(String(approvedAmount));
+      const newBalance = prevBalance - debitAmount;
+      await db.update(walletsTable).set({ balance: String(newBalance) }).where(eq(walletsTable.id, wallet.id));
+      await db.insert(walletTransactionsTable).values({
+        id: uid(), walletId: wallet.id, type: "bill_payment",
+        amount: String(debitAmount), balanceBefore: String(prevBalance), balanceAfter: String(newBalance),
+        narration: `Partial bill payment: ${existing.vendorName}`,
+        initiatedBy: actor.id, initiatedByName: actor.name,
+        relatedWalletId: null, relatedWalletName: null, relatedBillId: rawId!,
+      });
+    }
+  }
+
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 

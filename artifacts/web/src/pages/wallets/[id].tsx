@@ -14,28 +14,34 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ChevronLeft, ArrowRightLeft, ArrowDownRight, ArrowUpRight,
+  ChevronLeft, ArrowRightLeft, AlertTriangle,
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
-  Building2, Hash, Download,
+  Building2, Hash, Download, Receipt,
 } from "lucide-react";
+
+const LARGE_TRANSFER_THRESHOLD = 500_000;
 
 const TX_TYPE_CONFIG: Record<string, { label: string; color: string; sign: string }> = {
   credit:       { label: "Credit",       color: "bg-emerald-500/10 text-emerald-700 border-emerald-200", sign: "+" },
   debit:        { label: "Debit",        color: "bg-destructive/10 text-destructive border-destructive/20", sign: "-" },
   transfer_in:  { label: "Transfer In",  color: "bg-emerald-500/10 text-emerald-700 border-emerald-200", sign: "+" },
   transfer_out: { label: "Transfer Out", color: "bg-orange-500/10 text-orange-700 border-orange-200", sign: "-" },
+  bill_payment: { label: "Bill Payment", color: "bg-rose-500/10 text-rose-700 border-rose-200", sign: "-" },
 };
 
 function formatDateTime(s?: string | null) {
   if (!s) return "—";
   return new Date(s).toLocaleString("en-NG", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+
+type TransferStep = "form" | "confirm";
 
 export default function WalletDetail() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +52,8 @@ export default function WalletDetail() {
   const pageSize = 20;
 
   const [showTransfer, setShowTransfer] = useState(false);
+  const [transferStep, setTransferStep] = useState<TransferStep>("form");
+  const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [transferForm, setTransferForm] = useState({ fromWalletId: id ?? "", toWalletId: "", amount: "", narration: "" });
 
   const { data: walletData, isLoading: isWalletLoading } = useGetWallet(id!, {
@@ -66,10 +74,10 @@ export default function WalletDetail() {
     mutation: {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetWalletQueryKey(id!) });
-        qc.invalidateQueries({ queryKey: [`/api/wallets/${id}/statement`] });
+        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(id!, { page, pageSize }) });
         qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
         setShowTransfer(false);
-        setTransferForm({ fromWalletId: id ?? "", toWalletId: "", amount: "", narration: "" });
+        resetTransfer();
         toast({ title: "Transfer completed" });
       },
       onError: (err: unknown) => {
@@ -85,7 +93,33 @@ export default function WalletDetail() {
   const total = statement?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 
-  const handleTransfer = () => {
+  const isLargeTransfer = parseFloat(transferForm.amount || "0") > LARGE_TRANSFER_THRESHOLD;
+  const fromWallet = allWallets.find(w => w.id === transferForm.fromWalletId);
+  const toWallet = allWallets.find(w => w.id === transferForm.toWalletId);
+  const formValid =
+    !!transferForm.fromWalletId &&
+    !!transferForm.toWalletId &&
+    !!transferForm.amount &&
+    parseFloat(transferForm.amount) > 0 &&
+    !!transferForm.narration;
+
+  const resetTransfer = () => {
+    setTransferForm({ fromWalletId: id ?? "", toWalletId: "", amount: "", narration: "" });
+    setTransferStep("form");
+    setTransferConfirmed(false);
+  };
+
+  const closeTransfer = () => {
+    setShowTransfer(false);
+    resetTransfer();
+  };
+
+  const handleReviewOrConfirm = () => {
+    if (isLargeTransfer && transferStep === "form") {
+      setTransferStep("confirm");
+      setTransferConfirmed(false);
+      return;
+    }
     transfer.mutate({
       data: {
         fromWalletId: transferForm.fromWalletId,
@@ -183,15 +217,15 @@ export default function WalletDetail() {
           <div className="py-16 text-center text-muted-foreground">
             <ArrowRightLeft className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p className="font-semibold">No transactions yet</p>
-            <p className="text-sm mt-1">Transfers will appear here as a running ledger.</p>
+            <p className="text-sm mt-1">Transfers and bill payments will appear here as a running ledger.</p>
           </div>
         ) : (
           <>
             {/* Table Header */}
-            <div className="hidden md:grid grid-cols-[1fr_140px_1fr_120px_130px] gap-4 px-6 py-2 text-xs uppercase tracking-wider font-semibold text-muted-foreground border-b bg-muted/30">
+            <div className="hidden md:grid grid-cols-[1fr_130px_1fr_120px_130px] gap-4 px-6 py-2 text-xs uppercase tracking-wider font-semibold text-muted-foreground border-b bg-muted/30">
               <span>Date / Narration</span>
               <span>Type</span>
-              <span>Related Wallet</span>
+              <span>Reference</span>
               <span className="text-right">Amount</span>
               <span className="text-right">Balance After</span>
             </div>
@@ -202,7 +236,7 @@ export default function WalletDetail() {
                 const isPositive = cfg.sign === "+";
 
                 return (
-                  <div key={tx.id} className="px-6 py-3 grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_120px_130px] gap-1 md:gap-4 items-center" data-testid={`tx-row-${tx.id}`}>
+                  <div key={tx.id} className="px-6 py-3 grid grid-cols-1 md:grid-cols-[1fr_130px_1fr_120px_130px] gap-1 md:gap-4 items-center" data-testid={`tx-row-${tx.id}`}>
                     <div>
                       <p className="text-sm font-medium">{tx.narration ?? "—"}</p>
                       <p className="text-xs text-muted-foreground font-mono">{formatDateTime(tx.createdAt?.toString())}</p>
@@ -211,7 +245,15 @@ export default function WalletDetail() {
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${cfg.color}`}>{cfg.label}</span>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {tx.relatedWalletName ? (
+                      {tx.type === "bill_payment" && tx.relatedBillId ? (
+                        <Link
+                          href={`/bills/${tx.relatedBillId}`}
+                          className="inline-flex items-center gap-1 hover:underline hover:text-foreground transition-colors"
+                        >
+                          <Receipt className="w-3.5 h-3.5 shrink-0" />
+                          View Bill
+                        </Link>
+                      ) : tx.relatedWalletName ? (
                         <Link href={`/wallets/${tx.relatedWalletId}`} className="hover:underline hover:text-foreground transition-colors">
                           {tx.relatedWalletName}
                         </Link>
@@ -245,79 +287,133 @@ export default function WalletDetail() {
       </Card>
 
       {/* Transfer Dialog */}
-      <Dialog open={showTransfer} onOpenChange={setShowTransfer}>
+      <Dialog open={showTransfer} onOpenChange={open => { if (!open) closeTransfer(); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Transfer Funds</DialogTitle>
+            <DialogTitle>
+              {transferStep === "confirm" ? "Confirm Large Transfer" : "Transfer Funds"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">From Wallet</Label>
-              <Select
-                value={transferForm.fromWalletId}
-                onValueChange={(v) => setTransferForm(f => ({ ...f, fromWalletId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select wallet..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {allWallets.map(w => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          {transferStep === "form" ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">From Wallet</Label>
+                <Select
+                  value={transferForm.fromWalletId}
+                  onValueChange={(v) => setTransferForm(f => ({ ...f, fromWalletId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select wallet..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allWallets.map(w => (
+                      <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.toWalletId}>
+                        {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">To Wallet</Label>
+                <Select
+                  value={transferForm.toWalletId}
+                  onValueChange={(v) => setTransferForm(f => ({ ...f, toWalletId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select wallet..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allWallets.filter(w => w.id !== transferForm.fromWalletId).map(w => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  className="font-mono"
+                  value={transferForm.amount}
+                  onChange={(e) => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                />
+                {isLargeTransfer && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Large transfer — you'll need to confirm on the next step.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration</Label>
+                <Input
+                  placeholder="Purpose of transfer..."
+                  value={transferForm.narration}
+                  onChange={(e) => setTransferForm(f => ({ ...f, narration: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">To Wallet</Label>
-              <Select
-                value={transferForm.toWalletId}
-                onValueChange={(v) => setTransferForm(f => ({ ...f, toWalletId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select wallet..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {allWallets.filter(w => w.id !== transferForm.fromWalletId).map(w => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-amber-50 border-amber-200 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-amber-700 font-semibold text-sm">
+                  <AlertTriangle className="w-4 h-4" />
+                  Transfer above ₦500,000 — please review carefully
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-muted-foreground">From</span>
+                  <span className="font-semibold">{fromWallet?.name ?? "—"}</span>
+                  <span className="text-muted-foreground">To</span>
+                  <span className="font-semibold">{toWallet?.name ?? "—"}</span>
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-bold font-mono text-rose-600">{formatCurrency(parseFloat(transferForm.amount || "0"))}</span>
+                  <span className="text-muted-foreground">Narration</span>
+                  <span className="font-medium">{transferForm.narration}</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="transfer-confirm-check-detail"
+                  checked={transferConfirmed}
+                  onCheckedChange={(v) => setTransferConfirmed(!!v)}
+                  data-testid="checkbox-confirm-transfer"
+                />
+                <label htmlFor="transfer-confirm-check-detail" className="text-sm leading-snug cursor-pointer select-none">
+                  I confirm this transfer and understand it cannot be automatically reversed.
+                </label>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount</Label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                className="font-mono"
-                value={transferForm.amount}
-                onChange={(e) => setTransferForm(f => ({ ...f, amount: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration</Label>
-              <Input
-                placeholder="Purpose of transfer..."
-                value={transferForm.narration}
-                onChange={(e) => setTransferForm(f => ({ ...f, narration: e.target.value }))}
-              />
-            </div>
-          </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTransfer(false)}>Cancel</Button>
-            <Button
-              disabled={
-                !transferForm.fromWalletId || !transferForm.toWalletId ||
-                !transferForm.amount || !transferForm.narration ||
-                transfer.isPending
-              }
-              onClick={handleTransfer}
-            >
-              {transfer.isPending ? "Processing..." : "Transfer"}
-            </Button>
+            {transferStep === "confirm" ? (
+              <>
+                <Button variant="outline" onClick={() => setTransferStep("form")}>Back</Button>
+                <Button
+                  disabled={!transferConfirmed || transfer.isPending}
+                  onClick={handleReviewOrConfirm}
+                  data-testid="button-confirm-transfer"
+                >
+                  {transfer.isPending ? "Processing..." : "Confirm Transfer"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={closeTransfer}>Cancel</Button>
+                <Button
+                  disabled={!formValid || transfer.isPending}
+                  onClick={handleReviewOrConfirm}
+                  data-testid="button-confirm-transfer"
+                >
+                  {transfer.isPending ? "Processing..." : isLargeTransfer ? "Review Transfer" : "Transfer"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

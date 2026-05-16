@@ -1736,6 +1736,9 @@ components:
           type: string
         isLow:
           type: boolean
+        lowBalanceThreshold:
+          type: number
+          nullable: true
         ownedBy:
           type: string
         ownedByName:
@@ -1753,7 +1756,7 @@ components:
           type: string
         type:
           type: string
-          enum: [credit, debit, transfer_in, transfer_out]
+          enum: [credit, debit, transfer_in, transfer_out, bill_payment]
         amount:
           type: number
         balanceBefore:
@@ -1770,6 +1773,9 @@ components:
           type: string
           nullable: true
         relatedWalletName:
+          type: string
+          nullable: true
+        relatedBillId:
           type: string
           nullable: true
         createdAt:
@@ -1832,6 +1838,9 @@ components:
           type: string
         ownedBy:
           type: string
+        lowBalanceThreshold:
+          type: number
+          nullable: true
       required: [name, balance, currency]
 
     Notification:

@@ -14,12 +14,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Wallet, Plus, Pencil, ArrowRightLeft, ChevronRight } from "lucide-react";
+import { Wallet, Plus, Pencil, ArrowRightLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const LARGE_TRANSFER_THRESHOLD = 500_000;
+
+type TransferForm = { fromWalletId: string; toWalletId: string; amount: string; narration: string };
+type TransferStep = "form" | "confirm";
 
 export default function Wallets() {
   const { user } = useAuth();
@@ -29,7 +35,9 @@ export default function Wallets() {
   const [showCreate, setShowCreate] = useState(false);
   const [editWallet, setEditWallet] = useState<{ id: string; name: string; balance: number } | null>(null);
   const [showTransfer, setShowTransfer] = useState(false);
-  const [transferForm, setTransferForm] = useState({ fromWalletId: "", toWalletId: "", amount: "", narration: "" });
+  const [transferStep, setTransferStep] = useState<TransferStep>("form");
+  const [transferConfirmed, setTransferConfirmed] = useState(false);
+  const [transferForm, setTransferForm] = useState<TransferForm>({ fromWalletId: "", toWalletId: "", amount: "", narration: "" });
   const [form, setForm] = useState({ name: "", bankName: "", accountNumber: "", currency: "NGN", balance: "" });
 
   const { data, isLoading } = useListWallets(undefined, { query: { queryKey: getListWalletsQueryKey() } });
@@ -68,7 +76,7 @@ export default function Wallets() {
         qc.invalidateQueries({ queryKey: [`/api/wallets/${data.from.id}/statement`] });
         qc.invalidateQueries({ queryKey: [`/api/wallets/${data.to.id}/statement`] });
         setShowTransfer(false);
-        setTransferForm({ fromWalletId: "", toWalletId: "", amount: "", narration: "" });
+        resetTransfer();
         toast({ title: "Transfer completed successfully" });
       },
       onError: (err: unknown) => {
@@ -80,9 +88,48 @@ export default function Wallets() {
 
   const totalBalance = wallets.reduce((sum, w) => sum + (w.balance ?? 0), 0);
 
+  const resetTransfer = () => {
+    setTransferForm({ fromWalletId: "", toWalletId: "", amount: "", narration: "" });
+    setTransferStep("form");
+    setTransferConfirmed(false);
+  };
+
   const openTransfer = (fromId?: string) => {
-    setTransferForm({ fromWalletId: fromId ?? "", toWalletId: "", amount: "", narration: "" });
+    resetTransfer();
+    setTransferForm(f => ({ ...f, fromWalletId: fromId ?? "" }));
     setShowTransfer(true);
+  };
+
+  const closeTransfer = () => {
+    setShowTransfer(false);
+    resetTransfer();
+  };
+
+  const isLargeTransfer = parseFloat(transferForm.amount || "0") > LARGE_TRANSFER_THRESHOLD;
+  const fromWallet = wallets.find(w => w.id === transferForm.fromWalletId);
+  const toWallet = wallets.find(w => w.id === transferForm.toWalletId);
+
+  const formValid =
+    !!transferForm.fromWalletId &&
+    !!transferForm.toWalletId &&
+    !!transferForm.amount &&
+    parseFloat(transferForm.amount) > 0 &&
+    !!transferForm.narration;
+
+  const handleReviewOrConfirm = () => {
+    if (isLargeTransfer && transferStep === "form") {
+      setTransferStep("confirm");
+      setTransferConfirmed(false);
+      return;
+    }
+    transfer.mutate({
+      data: {
+        fromWalletId: transferForm.fromWalletId,
+        toWalletId: transferForm.toWalletId,
+        amount: parseFloat(transferForm.amount),
+        narration: transferForm.narration,
+      },
+    });
   };
 
   return (
@@ -226,81 +273,125 @@ export default function Wallets() {
       </Dialog>
 
       {/* Transfer Dialog */}
-      <Dialog open={showTransfer} onOpenChange={open => !open && setShowTransfer(false)}>
+      <Dialog open={showTransfer} onOpenChange={open => { if (!open) closeTransfer(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Transfer Funds</DialogTitle>
+            <DialogTitle>
+              {transferStep === "confirm" ? "Confirm Large Transfer" : "Transfer Funds"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>From Wallet</Label>
-              <Select value={transferForm.fromWalletId} onValueChange={v => setTransferForm(f => ({ ...f, fromWalletId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select source wallet" /></SelectTrigger>
-                <SelectContent>
-                  {wallets.map(w => (
-                    <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.toWalletId}>
-                      {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          {transferStep === "form" ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>From Wallet</Label>
+                <Select value={transferForm.fromWalletId} onValueChange={v => setTransferForm(f => ({ ...f, fromWalletId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select source wallet" /></SelectTrigger>
+                  <SelectContent>
+                    {wallets.map(w => (
+                      <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.toWalletId}>
+                        {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>To Wallet</Label>
+                <Select value={transferForm.toWalletId} onValueChange={v => setTransferForm(f => ({ ...f, toWalletId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select destination wallet" /></SelectTrigger>
+                  <SelectContent>
+                    {wallets.map(w => (
+                      <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.fromWalletId}>
+                        {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Amount (₦)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="font-mono"
+                  value={transferForm.amount}
+                  onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
+                />
+                {isLargeTransfer && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Large transfer — you'll need to confirm on the next step.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Narration / Reason</Label>
+                <Input
+                  placeholder="Office petty cash top-up"
+                  value={transferForm.narration}
+                  onChange={e => setTransferForm(f => ({ ...f, narration: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>To Wallet</Label>
-              <Select value={transferForm.toWalletId} onValueChange={v => setTransferForm(f => ({ ...f, toWalletId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select destination wallet" /></SelectTrigger>
-                <SelectContent>
-                  {wallets.map(w => (
-                    <SelectItem key={w.id} value={w.id} disabled={w.id === transferForm.fromWalletId}>
-                      {w.name} — {formatCurrency(w.balance ?? 0, w.currency ?? "NGN")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-amber-50 border-amber-200 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-amber-700 font-semibold text-sm">
+                  <AlertTriangle className="w-4 h-4" />
+                  Transfer above ₦500,000 — please review carefully
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-muted-foreground">From</span>
+                  <span className="font-semibold">{fromWallet?.name ?? "—"}</span>
+                  <span className="text-muted-foreground">To</span>
+                  <span className="font-semibold">{toWallet?.name ?? "—"}</span>
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-bold font-mono text-rose-600">{formatCurrency(parseFloat(transferForm.amount || "0"))}</span>
+                  <span className="text-muted-foreground">Narration</span>
+                  <span className="font-medium">{transferForm.narration}</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="transfer-confirm-check"
+                  checked={transferConfirmed}
+                  onCheckedChange={(v) => setTransferConfirmed(!!v)}
+                  data-testid="checkbox-confirm-transfer"
+                />
+                <label htmlFor="transfer-confirm-check" className="text-sm leading-snug cursor-pointer select-none">
+                  I confirm this transfer and understand it cannot be automatically reversed.
+                </label>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Amount (₦)</Label>
-              <Input
-                type="number"
-                min="1"
-                step="0.01"
-                placeholder="0.00"
-                className="font-mono"
-                value={transferForm.amount}
-                onChange={e => setTransferForm(f => ({ ...f, amount: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Narration / Reason</Label>
-              <Input
-                placeholder="Office petty cash top-up"
-                value={transferForm.narration}
-                onChange={e => setTransferForm(f => ({ ...f, narration: e.target.value }))}
-              />
-            </div>
-          </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTransfer(false)}>Cancel</Button>
-            <Button
-              onClick={() => transfer.mutate({
-                data: {
-                  fromWalletId: transferForm.fromWalletId,
-                  toWalletId: transferForm.toWalletId,
-                  amount: parseFloat(transferForm.amount),
-                  narration: transferForm.narration,
-                },
-              })}
-              disabled={
-                !transferForm.fromWalletId ||
-                !transferForm.toWalletId ||
-                !transferForm.amount ||
-                !transferForm.narration ||
-                transfer.isPending
-              }
-              data-testid="button-confirm-transfer"
-            >
-              {transfer.isPending ? "Transferring…" : "Confirm Transfer"}
-            </Button>
+            {transferStep === "confirm" ? (
+              <>
+                <Button variant="outline" onClick={() => setTransferStep("form")}>Back</Button>
+                <Button
+                  onClick={handleReviewOrConfirm}
+                  disabled={!transferConfirmed || transfer.isPending}
+                  data-testid="button-confirm-transfer"
+                >
+                  {transfer.isPending ? "Transferring…" : "Confirm Transfer"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={closeTransfer}>Cancel</Button>
+                <Button
+                  onClick={handleReviewOrConfirm}
+                  disabled={!formValid || transfer.isPending}
+                  data-testid="button-confirm-transfer"
+                >
+                  {transfer.isPending ? "Transferring…" : isLargeTransfer ? "Review Transfer" : "Confirm Transfer"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

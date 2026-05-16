@@ -11,6 +11,7 @@ export const walletsTable = pgTable("wallets", {
   balance: numeric("balance", { precision: 15, scale: 2 }).notNull().default("0"),
   currency: text("currency").notNull().default("NGN"),
   isLow: boolean("is_low").notNull().default(false),
+  lowBalanceThreshold: numeric("low_balance_threshold", { precision: 15, scale: 2 }),
   ownedBy: text("owned_by").references(() => usersTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

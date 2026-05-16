@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql, or } from "drizzle-orm";
-import { db, walletsTable, usersTable, walletTransactionsTable, auditTable } from "@workspace/db";
+import { eq, desc, sql } from "drizzle-orm";
+import { db, walletsTable, usersTable, walletTransactionsTable, auditTable, notificationsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -51,7 +51,7 @@ router.get("/wallets", async (req, res): Promise<void> => {
 // POST /wallets — create wallet (MD only or self)
 router.post("/wallets", async (req, res): Promise<void> => {
   const actor = req.user!;
-  const { name, bankName, accountNumber, balance, currency, ownedBy: bodyOwnedBy } = req.body;
+  const { name, bankName, accountNumber, balance, currency, ownedBy: bodyOwnedBy, lowBalanceThreshold } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
   const ownedBy = actor.role === "md" && bodyOwnedBy ? bodyOwnedBy : actor.id;
@@ -64,6 +64,7 @@ router.post("/wallets", async (req, res): Promise<void> => {
     balance: String(balance ?? 0),
     currency: currency ?? "NGN",
     ownedBy,
+    lowBalanceThreshold: lowBalanceThreshold != null ? String(lowBalanceThreshold) : null,
   }).returning();
 
   let ownerName: string | undefined;
@@ -212,6 +213,34 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     debitTx: fmtTx(result.debitTx),
     creditTx: fmtTx(result.creditTx),
   });
+
+  // Low-balance notifications (fire-and-forget after response sent)
+  const mdUsers = await db.select({ id: usersTable.id }).from(usersTable)
+    .where(sql`${usersTable.role} = 'md'`);
+
+  for (const wallet of [result.from, result.to]) {
+    const threshold = wallet.lowBalanceThreshold != null ? parseFloat(String(wallet.lowBalanceThreshold)) : null;
+    const balance = parseFloat(String(wallet.balance));
+    if (threshold !== null && balance < threshold) {
+      const recipientIds = new Set<string>();
+      if (wallet.ownedBy) recipientIds.add(wallet.ownedBy);
+      for (const md of mdUsers) recipientIds.add(md.id);
+
+      const notifs = [...recipientIds].map(userId => ({
+        id: uid(),
+        userId,
+        type: "wallet_low" as const,
+        title: "Low Wallet Balance",
+        body: `${wallet.name} balance is ₦${balance.toLocaleString("en-NG")} — below the ₦${threshold.toLocaleString("en-NG")} threshold.`,
+        billId: null,
+      }));
+      if (notifs.length) await db.insert(notificationsTable).values(notifs);
+
+      await db.update(walletsTable).set({ isLow: true }).where(eq(walletsTable.id, wallet.id));
+    } else if (threshold !== null && balance >= threshold && wallet.isLow) {
+      await db.update(walletsTable).set({ isLow: false }).where(eq(walletsTable.id, wallet.id));
+    }
+  }
 });
 
 // GET /wallets/:id — wallet detail with recent transactions
@@ -291,7 +320,7 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
 router.patch("/wallets/:id", async (req, res): Promise<void> => {
   const actor = req.user!;
   const id = req.params["id"] as string;
-  const { balance, name, bankName, accountNumber, currency, ownedBy } = req.body;
+  const { balance, name, bankName, accountNumber, currency, ownedBy, lowBalanceThreshold } = req.body;
 
   const [existing] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Wallet not found" }); return; }
@@ -308,6 +337,7 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
   if (accountNumber !== undefined) updates["accountNumber"] = accountNumber;
   if (currency !== undefined) updates["currency"] = currency;
   if (ownedBy !== undefined && actor.role === "md") updates["ownedBy"] = ownedBy;
+  if (lowBalanceThreshold !== undefined) updates["lowBalanceThreshold"] = lowBalanceThreshold != null ? String(lowBalanceThreshold) : null;
 
   if (Object.keys(updates).length === 0) {
     res.status(400).json({ error: "No fields to update" });

@@ -7,7 +7,7 @@ import { usersTable } from "./users";
 export const walletTransactionsTable = pgTable("wallet_transactions", {
   id: text("id").primaryKey(),
   walletId: text("wallet_id").notNull().references(() => walletsTable.id, { onDelete: "cascade" }),
-  type: text("type", { enum: ["credit", "debit", "transfer_in", "transfer_out"] }).notNull(),
+  type: text("type", { enum: ["credit", "debit", "transfer_in", "transfer_out", "bill_payment"] }).notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   balanceBefore: numeric("balance_before", { precision: 15, scale: 2 }).notNull(),
   balanceAfter: numeric("balance_after", { precision: 15, scale: 2 }).notNull(),
@@ -16,6 +16,7 @@ export const walletTransactionsTable = pgTable("wallet_transactions", {
   initiatedByName: text("initiated_by_name").notNull(),
   relatedWalletId: text("related_wallet_id").references(() => walletsTable.id, { onDelete: "set null" }),
   relatedWalletName: text("related_wallet_name"),
+  relatedBillId: text("related_bill_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

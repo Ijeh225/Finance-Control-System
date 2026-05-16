@@ -159,6 +159,7 @@ export const GetWalletBalancesResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -334,6 +335,7 @@ export const GetUserProfileResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -992,6 +994,7 @@ export const ListWalletsResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1008,7 +1011,8 @@ export const CreateWalletBody = zod.object({
   "accountNumber": zod.string().optional(),
   "balance": zod.number(),
   "currency": zod.string(),
-  "ownedBy": zod.string().optional()
+  "ownedBy": zod.string().optional(),
+  "lowBalanceThreshold": zod.number().nullish()
 })
 
 
@@ -1027,6 +1031,7 @@ export const GetWalletResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1034,7 +1039,7 @@ export const GetWalletResponse = zod.object({
   "recentTransactions": zod.array(zod.object({
   "id": zod.string(),
   "walletId": zod.string(),
-  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out', 'bill_payment']),
   "amount": zod.number(),
   "balanceBefore": zod.number(),
   "balanceAfter": zod.number(),
@@ -1043,6 +1048,7 @@ export const GetWalletResponse = zod.object({
   "initiatedByName": zod.string(),
   "relatedWalletId": zod.string().nullish(),
   "relatedWalletName": zod.string().nullish(),
+  "relatedBillId": zod.string().nullish(),
   "createdAt": zod.string()
 }))
 }))
@@ -1068,6 +1074,7 @@ export const UpdateWalletResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1093,6 +1100,7 @@ export const TransferFundsResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1105,6 +1113,7 @@ export const TransferFundsResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1112,7 +1121,7 @@ export const TransferFundsResponse = zod.object({
   "debitTx": zod.object({
   "id": zod.string(),
   "walletId": zod.string(),
-  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out', 'bill_payment']),
   "amount": zod.number(),
   "balanceBefore": zod.number(),
   "balanceAfter": zod.number(),
@@ -1121,12 +1130,13 @@ export const TransferFundsResponse = zod.object({
   "initiatedByName": zod.string(),
   "relatedWalletId": zod.string().nullish(),
   "relatedWalletName": zod.string().nullish(),
+  "relatedBillId": zod.string().nullish(),
   "createdAt": zod.string()
 }),
   "creditTx": zod.object({
   "id": zod.string(),
   "walletId": zod.string(),
-  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out', 'bill_payment']),
   "amount": zod.number(),
   "balanceBefore": zod.number(),
   "balanceAfter": zod.number(),
@@ -1135,6 +1145,7 @@ export const TransferFundsResponse = zod.object({
   "initiatedByName": zod.string(),
   "relatedWalletId": zod.string().nullish(),
   "relatedWalletName": zod.string().nullish(),
+  "relatedBillId": zod.string().nullish(),
   "createdAt": zod.string()
 })
 })
@@ -1164,6 +1175,7 @@ export const GetWalletStatementResponse = zod.object({
   "balance": zod.number(),
   "currency": zod.string(),
   "isLow": zod.boolean().optional(),
+  "lowBalanceThreshold": zod.number().nullish(),
   "ownedBy": zod.string().optional(),
   "ownedByName": zod.string().optional(),
   "createdAt": zod.string()
@@ -1171,7 +1183,7 @@ export const GetWalletStatementResponse = zod.object({
   "transactions": zod.array(zod.object({
   "id": zod.string(),
   "walletId": zod.string(),
-  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out']),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out', 'bill_payment']),
   "amount": zod.number(),
   "balanceBefore": zod.number(),
   "balanceAfter": zod.number(),
@@ -1180,6 +1192,7 @@ export const GetWalletStatementResponse = zod.object({
   "initiatedByName": zod.string(),
   "relatedWalletId": zod.string().nullish(),
   "relatedWalletName": zod.string().nullish(),
+  "relatedBillId": zod.string().nullish(),
   "createdAt": zod.string()
 })),
   "total": zod.number(),
