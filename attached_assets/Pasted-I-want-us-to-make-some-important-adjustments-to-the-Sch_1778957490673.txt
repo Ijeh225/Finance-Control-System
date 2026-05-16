@@ -1,0 +1,79 @@
+I want us to make some important adjustments to the Scheduled Payments, Bills, Approval, and Vendor synchronization workflow so the entire system works together properly like a real accounting and treasury platform.
+
+First, in the “Scheduled Today” and “Scheduled Tomorrow” sections, once a payment has been approved and processed, that bill should no longer remain inside the pending scheduled payment list.
+
+After payment is made, the bill should automatically move to another section such as:
+
+* Paid Bills
+* Completed Payments
+* Processed Transactions
+* Payment History
+
+This is important so users can clearly differentiate between:
+
+* Pending payments
+* Partially paid bills
+* Completed payments
+* Rescheduled bills
+
+Another important thing is resubmission or rescheduling of uncleared bills.
+
+For example:
+If Lucy’s total bill is ₦100,000 and we only pay ₦10,000 today, the remaining balance is still outstanding.
+
+The next day, the Payment Assistant should be able to:
+
+* Re-submit the remaining balance
+* Re-schedule the outstanding payment for another day
+* Push it back into “Tomorrow’s Scheduled Payments”
+* Continue tracking the remaining liability
+
+This means partially paid bills should not disappear after payment. Instead, they should remain active until the vendor balance becomes fully cleared.
+
+We should therefore have:
+
+* Outstanding Bills
+* Partially Paid Bills
+* Rescheduled Bills
+* Completed Bills
+
+Another important adjustment is inside the Vendor/Beneficiary section.
+
+Right now, there is no proper structure to continue adding new jobs/work to an existing vendor account.
+
+For example:
+Lucy does a job today worth ₦100,000.
+Tomorrow Lucy does another job worth ₦50,000.
+
+Instead of creating isolated records, the system should allow the Payment Assistant to:
+
+* Open Lucy’s vendor profile
+* Add another bill/job
+* Add a new job description
+* Add another amount
+* Automatically update Lucy’s total running balance
+
+Example:
+Previous Outstanding:
+₦100,000
+
+New Job Added:
+₦50,000
+
+Updated Outstanding:
+₦150,000
+
+The system should continuously accumulate all liabilities under that vendor profile while still keeping each individual job description and transaction history properly documented.
+
+The Vendor module, Bills module, Approval module, and Payment module should all work together and synchronize automatically.
+
+For example:
+
+* If a bill is created, it should reflect in the vendor account
+* If payment is made, the vendor balance should reduce automatically
+* If a bill is partially paid, the remaining balance should remain active
+* If another job is added to the same vendor, the balance should increase automatically
+* If a bill is rescheduled, it should appear in future scheduled payments
+* If payment is completed fully, the bill should move to completed payment history
+
+Everything should work together like a connected accounting ledger and treasury workflow system instead of separate disconnected modules.
