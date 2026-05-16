@@ -1821,6 +1821,8 @@ components:
           type: string
         billId:
           type: string
+        billDescription:
+          type: string
         userId:
           type: string
         userName:

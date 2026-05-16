@@ -113,13 +113,25 @@ router.get("/dashboard/activity", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const limit = parseInt(String(req.query["limit"] ?? "20"));
   const conditions = userId ? [eq(auditTable.userId, userId)] : [];
-  const entries = await db
-    .select()
+  const rows = await db
+    .select({
+      id: auditTable.id,
+      billId: auditTable.billId,
+      billDescription: billsTable.description,
+      userId: auditTable.userId,
+      userName: auditTable.userName,
+      action: auditTable.action,
+      details: auditTable.details,
+      oldValue: auditTable.oldValue,
+      newValue: auditTable.newValue,
+      createdAt: auditTable.createdAt,
+    })
     .from(auditTable)
+    .leftJoin(billsTable, eq(auditTable.billId, billsTable.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(sql`${auditTable.createdAt} desc`)
     .limit(limit);
-  res.json({ activities: entries.map(formatAudit) });
+  res.json({ activities: rows });
 });
 
 function formatBill(b: Record<string, unknown>) {

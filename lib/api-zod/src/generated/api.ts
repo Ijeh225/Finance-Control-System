@@ -181,6 +181,7 @@ export const GetRecentActivityResponse = zod.object({
   "activities": zod.array(zod.object({
   "id": zod.string(),
   "billId": zod.string().optional(),
+  "billDescription": zod.string().optional(),
   "userId": zod.string(),
   "userName": zod.string(),
   "action": zod.string(),
@@ -466,6 +467,7 @@ export const GetBillResponse = zod.object({
   "auditTrail": zod.array(zod.object({
   "id": zod.string(),
   "billId": zod.string().optional(),
+  "billDescription": zod.string().optional(),
   "userId": zod.string(),
   "userName": zod.string(),
   "action": zod.string(),
@@ -839,6 +841,7 @@ export const GetBillAuditResponse = zod.object({
   "entries": zod.array(zod.object({
   "id": zod.string(),
   "billId": zod.string().optional(),
+  "billDescription": zod.string().optional(),
   "userId": zod.string(),
   "userName": zod.string(),
   "action": zod.string(),
@@ -931,6 +934,7 @@ export const GetVendorResponse = zod.object({
   "recentActivity": zod.array(zod.object({
   "id": zod.string(),
   "billId": zod.string().optional(),
+  "billDescription": zod.string().optional(),
   "userId": zod.string(),
   "userName": zod.string(),
   "action": zod.string(),
@@ -1244,6 +1248,7 @@ export const ListAuditTrailResponse = zod.object({
   "entries": zod.array(zod.object({
   "id": zod.string(),
   "billId": zod.string().optional(),
+  "billDescription": zod.string().optional(),
   "userId": zod.string(),
   "userName": zod.string(),
   "action": zod.string(),

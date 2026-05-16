@@ -160,6 +160,7 @@ export interface Comment {
 export interface AuditEntry {
   id: string;
   billId?: string;
+  billDescription?: string;
   userId: string;
   userName: string;
   action: string;

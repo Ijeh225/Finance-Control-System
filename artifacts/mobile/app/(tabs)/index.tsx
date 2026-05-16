@@ -76,7 +76,7 @@ function ActivityRow({
 }) {
   const meta = getActionMeta(entry.action, colors);
   const canNavigate = !!entry.billId;
-  const description = entry.details ?? meta.label;
+  const description = entry.billDescription ?? entry.details ?? meta.label;
 
   return (
     <Pressable
@@ -123,7 +123,7 @@ export default function DashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleActivityPress = useCallback((entry: AuditEntry) => {
-    if (entry.billId) router.push(`/bill/${entry.billId}` as any);
+    if (entry.billId) router.push(`/bill/${entry.billId}`);
   }, []);
 
   function handleSignOut() {
