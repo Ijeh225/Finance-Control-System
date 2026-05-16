@@ -3,10 +3,13 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 
 export default function TabLayout() {
   const colors = useColors();
+  const { user } = useAuth();
   const isWeb = Platform.OS === "web";
+  const isMd = user?.role === "md";
 
   return (
     <Tabs
@@ -71,6 +74,16 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={24} color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="audit"
+        options={{
+          title: "Audit",
+          href: isMd ? undefined : null,
+          tabBarIcon: ({ color }) => <Feather name="shield" size={24} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({});
