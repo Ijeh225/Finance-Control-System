@@ -26,6 +26,7 @@ import ScheduledToday from "@/pages/scheduled-today/index";
 import ScheduledTomorrow from "@/pages/scheduled-tomorrow/index";
 import OverdueBills from "@/pages/overdue/index";
 import OutstandingLiabilities from "@/pages/outstanding/index";
+import PaymentHistory from "@/pages/payment-history/index";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -77,6 +78,7 @@ function AppRoutes() {
       <Route path="/scheduled-tomorrow" component={() => <ProtectedRoute component={ScheduledTomorrow} />} />
       <Route path="/overdue" component={() => <ProtectedRoute component={OverdueBills} />} />
       <Route path="/outstanding" component={() => <ProtectedRoute component={OutstandingLiabilities} />} />
+      <Route path="/payment-history" component={() => <ProtectedRoute component={PaymentHistory} />} />
       <Route component={NotFound} />
     </Switch>
   );

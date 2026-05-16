@@ -12,7 +12,8 @@ import {
   Activity, 
   Settings,
   LogOut,
-  ShieldAlert
+  ShieldAlert,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -86,6 +87,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <NavItem href="/vendors" icon={<Users className="w-4 h-4" />} label="Vendors" isActive={location.startsWith("/vendors")} />
           <NavItem href="/wallets" icon={<Wallet className="w-4 h-4" />} label="Wallets" isActive={location.startsWith("/wallets")} />
           <NavItem href="/notifications" icon={<Bell className="w-4 h-4" />} label="Notifications" isActive={location.startsWith("/notifications")} badge={unreadCount} />
+          <NavItem href="/payment-history" icon={<History className="w-4 h-4" />} label="Payment History" isActive={location.startsWith("/payment-history")} />
           <NavItem href="/reports" icon={<FileBarChart className="w-4 h-4" />} label="Reports" isActive={location.startsWith("/reports")} />
           
           {user?.role === 'md' && (

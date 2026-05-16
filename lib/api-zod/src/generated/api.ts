@@ -38,6 +38,8 @@ export const GetDashboardSummaryResponse = zod.object({
   "totalWalletBalance": zod.number(),
   "paidTodayCount": zod.number(),
   "paidTodayAmount": zod.number(),
+  "paidAllTimeCount": zod.number(),
+  "paidAllTimeAmount": zod.number(),
   "partialPaymentsCount": zod.number(),
   "partialPaymentsAmount": zod.number(),
   "unreadNotificationsCount": zod.number()
@@ -209,6 +211,46 @@ export const GetRecentActivityResponse = zod.object({
   "newValue": zod.string().optional(),
   "createdAt": zod.string()
 }))
+})
+
+
+/**
+ * @summary All paid bills (payment history), newest first
+ */
+export const GetPaymentHistoryQueryParams = zod.object({
+  "userId": zod.coerce.string().optional().describe('Filter by user ID (omit for all — MD only)')
+})
+
+export const GetPaymentHistoryResponse = zod.object({
+  "bills": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "approvedAmount": zod.number().optional(),
+  "paidAmount": zod.number(),
+  "outstandingBalance": zod.number(),
+  "scheduledDate": zod.string(),
+  "dueDate": zod.string().optional(),
+  "walletId": zod.string().optional(),
+  "walletName": zod.string().optional(),
+  "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "hasAttachment": zod.boolean().optional(),
+  "overdueDays": zod.number().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "paidBy": zod.string().optional(),
+  "paidByName": zod.string().optional(),
+  "paidAt": zod.string().optional(),
+  "paymentReference": zod.string().optional(),
+  "paidWalletId": zod.string().optional(),
+  "paidWalletName": zod.string().optional()
+})),
+  "total": zod.number()
 })
 
 
@@ -812,6 +854,47 @@ export const ProcessBillPaymentBody = zod.object({
 })
 
 export const ProcessBillPaymentResponse = zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "approvedAmount": zod.number().optional(),
+  "paidAmount": zod.number(),
+  "outstandingBalance": zod.number(),
+  "scheduledDate": zod.string(),
+  "dueDate": zod.string().optional(),
+  "walletId": zod.string().optional(),
+  "walletName": zod.string().optional(),
+  "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "hasAttachment": zod.boolean().optional(),
+  "overdueDays": zod.number().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "paidBy": zod.string().optional(),
+  "paidByName": zod.string().optional(),
+  "paidAt": zod.string().optional(),
+  "paymentReference": zod.string().optional(),
+  "paidWalletId": zod.string().optional(),
+  "paidWalletName": zod.string().optional()
+})
+
+
+/**
+ * @summary Reschedule a partial or approved bill to a new scheduled date
+ */
+export const RescheduleBillParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const RescheduleBillBody = zod.object({
+  "scheduledDate": zod.string().describe('New scheduled date in YYYY-MM-DD format')
+})
+
+export const RescheduleBillResponse = zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),
   "vendorName": zod.string(),

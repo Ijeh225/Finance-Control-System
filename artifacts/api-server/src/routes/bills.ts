@@ -377,6 +377,39 @@ router.post("/bills/:id/escalate", async (req, res): Promise<void> => {
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
+// ─── Reschedule ───────────────────────────────────────────────────────────────
+
+router.post("/bills/:id/reschedule", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const { scheduledDate } = req.body;
+  if (!scheduledDate) { res.status(400).json({ error: "scheduledDate is required" }); return; }
+
+  // Only partial or approved bills can be rescheduled; must be creator or MD
+  if (!["partial", "approved"].includes(bill.status ?? "")) {
+    res.status(400).json({ error: "Only partial or approved bills can be rescheduled" }); return;
+  }
+  if (actor.role !== "md" && bill.createdBy !== actor.id) {
+    res.status(403).json({ error: "Only the bill creator or MD can reschedule" }); return;
+  }
+
+  const [updated] = await db
+    .update(billsTable)
+    .set({ scheduledDate, updatedAt: new Date() })
+    .where(eq(billsTable.id, rawId!))
+    .returning();
+
+  await addAudit(rawId!, actor.id, actor.name, "rescheduled",
+    `Rescheduled to ${scheduledDate}`, bill.scheduledDate ?? undefined, scheduledDate);
+
+  req.log.info({ billId: rawId, actor: actor.id, scheduledDate }, "Bill rescheduled");
+  res.json(formatBill(updated as unknown as Record<string, unknown>));
+});
+
 // ─── Withdraw ────────────────────────────────────────────────────────────────
 
 router.post("/bills/:id/withdraw", async (req, res): Promise<void> => {

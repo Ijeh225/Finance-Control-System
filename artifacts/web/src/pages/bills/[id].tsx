@@ -16,6 +16,9 @@ import {
   useListWallets, getListWalletsQueryKey,
   useListVendors, getListVendorsQueryKey,
   useProcessBillPayment,
+  useRescheduleBill,
+  getGetScheduledTodayQueryKey,
+  getGetScheduledTomorrowQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
@@ -32,7 +35,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpCircle,
   ChevronLeft, MessageSquare, Activity, User, Send,
   Paperclip, Upload, Download, Trash2, FileText, Pencil,
-  Wallet, CreditCard, BadgeCheck, Hash,
+  Wallet, CreditCard, BadgeCheck, Hash, CalendarClock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -82,6 +85,9 @@ export default function BillDetail() {
   const [payAmount, setPayAmount] = useState("");
   const [payReference, setPayReference] = useState("");
   const [payNarration, setPayNarration] = useState("");
+
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
 
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -164,6 +170,20 @@ export default function BillDetail() {
         toast({ title: "Bill updated" });
       },
       onError: () => toast({ title: "Failed to update bill", variant: "destructive" }),
+    },
+  });
+
+  const reschedule = useRescheduleBill({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        qc.invalidateQueries({ queryKey: getGetScheduledTodayQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetScheduledTomorrowQueryKey() });
+        setShowReschedule(false);
+        setRescheduleDate("");
+        toast({ title: "Bill rescheduled" });
+      },
+      onError: () => toast({ title: "Failed to reschedule bill", variant: "destructive" }),
     },
   });
 
@@ -279,6 +299,8 @@ export default function BillDetail() {
   const canWithdraw = !isMd && bill.status === "pending" && bill.createdBy === user?.id;
   const canPay = (user?.role === "payment_assistant" || isMd) &&
     ["approved", "partial"].includes(bill.status ?? "") &&
+    (isMd || bill.createdBy === user?.id);
+  const canReschedule = ["partial", "approved"].includes(bill.status ?? "") &&
     (isMd || bill.createdBy === user?.id);
   const attachments = attachmentsData?.attachments ?? [];
 
@@ -526,6 +548,24 @@ export default function BillDetail() {
             </Button>
           </CardContent>
         </Card>
+      )}
+
+      {/* Reschedule */}
+      {canReschedule && (
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-sky-300 text-sky-700 hover:bg-sky-50"
+            onClick={() => { setRescheduleDate(bill.scheduledDate ?? ""); setShowReschedule(true); }}
+            data-testid="button-reschedule-bill"
+          >
+            <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Reschedule
+          </Button>
+          {bill.scheduledDate && (
+            <span className="text-xs text-muted-foreground">Currently scheduled: <span className="font-semibold font-mono">{bill.scheduledDate}</span></span>
+          )}
+        </div>
       )}
 
       {/* Attachments */}
@@ -802,6 +842,42 @@ export default function BillDetail() {
               data-testid="button-confirm-payment"
             >
               {processPayment.isPending ? "Processing..." : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Dialog */}
+      <Dialog open={showReschedule} onOpenChange={setShowReschedule}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-sky-600" /> Reschedule Bill
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Set a new scheduled date for the remaining balance of <span className="font-semibold text-foreground">{formatCurrency(remainingApproved)}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">New Scheduled Date *</Label>
+              <Input
+                type="date"
+                value={rescheduleDate}
+                onChange={(e) => setRescheduleDate(e.target.value)}
+                data-testid="input-reschedule-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowReschedule(false)}>Cancel</Button>
+            <Button
+              className="bg-sky-600 hover:bg-sky-700 text-white"
+              disabled={reschedule.isPending || !rescheduleDate}
+              onClick={() => reschedule.mutate({ id: id!, data: { scheduledDate: rescheduleDate } })}
+              data-testid="button-confirm-reschedule"
+            >
+              {reschedule.isPending ? "Rescheduling..." : "Confirm Reschedule"}
             </Button>
           </DialogFooter>
         </DialogContent>

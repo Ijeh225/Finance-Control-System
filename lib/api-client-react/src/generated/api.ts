@@ -48,6 +48,8 @@ import type {
   GetPaidTodayParams,
   GetPartialPayments200,
   GetPartialPaymentsParams,
+  GetPaymentHistory200,
+  GetPaymentHistoryParams,
   GetPendingApprovals200,
   GetPendingApprovalsParams,
   GetRecentActivity200,
@@ -82,6 +84,7 @@ import type {
   RejectBillBody,
   RequestAttachmentUploadInput,
   RequestAttachmentUploadResponse,
+  RescheduleBillBody,
   TransferFunds200,
   TransferInput,
   UpdateBillInput,
@@ -672,6 +675,90 @@ export function useGetRecentActivity<TData = Awaited<ReturnType<typeof getRecent
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRecentActivityQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPaymentHistoryUrl = (params?: GetPaymentHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/payment-history?${stringifiedParams}` : `/api/dashboard/payment-history`
+}
+
+/**
+ * @summary All paid bills (payment history), newest first
+ */
+export const getPaymentHistory = async (params?: GetPaymentHistoryParams, options?: RequestInit): Promise<GetPaymentHistory200> => {
+
+  return customFetch<GetPaymentHistory200>(getGetPaymentHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaymentHistoryQueryKey = (params?: GetPaymentHistoryParams,) => {
+    return [
+    `/api/dashboard/payment-history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPaymentHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getPaymentHistory>>, TError = ErrorType<unknown>>(params?: GetPaymentHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaymentHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaymentHistory>>> = ({ signal }) => getPaymentHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaymentHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaymentHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getPaymentHistory>>>
+export type GetPaymentHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary All paid bills (payment history), newest first
+ */
+
+export function useGetPaymentHistory<TData = Awaited<ReturnType<typeof getPaymentHistory>>, TError = ErrorType<unknown>>(
+ params?: GetPaymentHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaymentHistoryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1932,6 +2019,78 @@ export const useProcessBillPayment = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getProcessBillPaymentMutationOptions(options));
+    }
+
+export const getRescheduleBillUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/reschedule`
+}
+
+/**
+ * @summary Reschedule a partial or approved bill to a new scheduled date
+ */
+export const rescheduleBill = async (id: string,
+    rescheduleBillBody: RescheduleBillBody, options?: RequestInit): Promise<Bill> => {
+
+  return customFetch<Bill>(getRescheduleBillUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      rescheduleBillBody,)
+  }
+);}
+
+
+
+
+export const getRescheduleBillMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rescheduleBill>>, TError,{id: string;data: BodyType<RescheduleBillBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rescheduleBill>>, TError,{id: string;data: BodyType<RescheduleBillBody>}, TContext> => {
+
+const mutationKey = ['rescheduleBill'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rescheduleBill>>, {id: string;data: BodyType<RescheduleBillBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  rescheduleBill(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RescheduleBillMutationResult = NonNullable<Awaited<ReturnType<typeof rescheduleBill>>>
+    export type RescheduleBillMutationBody = BodyType<RescheduleBillBody>
+    export type RescheduleBillMutationError = ErrorType<void>
+
+    /**
+ * @summary Reschedule a partial or approved bill to a new scheduled date
+ */
+export const useRescheduleBill = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rescheduleBill>>, TError,{id: string;data: BodyType<RescheduleBillBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rescheduleBill>>,
+        TError,
+        {id: string;data: BodyType<RescheduleBillBody>},
+        TContext
+      > => {
+      return useMutation(getRescheduleBillMutationOptions(options));
     }
 
 export const getRequestBillAttachmentUploadUrl = (id: string,) => {

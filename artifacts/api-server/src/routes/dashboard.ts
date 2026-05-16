@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, notInArray, sql } from "drizzle-orm";
 import { db, billsTable, walletsTable, notificationsTable, auditTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -39,13 +39,15 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
       : db.select().from(notificationsTable).where(eq(notificationsTable.isRead, false)),
   ]);
 
-  const scheduledToday = bills.filter(b => b.scheduledDate === t);
-  const scheduledTomorrow = bills.filter(b => b.scheduledDate === tom);
+  const actionableStatuses = ["pending", "approved", "partial", "on_hold", "overdue"];
+  const scheduledToday = bills.filter(b => b.scheduledDate === t && actionableStatuses.includes(b.status ?? ""));
+  const scheduledTomorrow = bills.filter(b => b.scheduledDate === tom && actionableStatuses.includes(b.status ?? ""));
   const pending = bills.filter(b => b.status === "pending");
   const approvedUnpaid = bills.filter(b => b.status === "approved");
   const overdue = bills.filter(b => b.status === "overdue");
   const paidToday = bills.filter(b => b.status === "paid" && b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
   const partial = bills.filter(b => b.status === "partial");
+  const paidAllTime = bills.filter(b => b.status === "paid");
 
   const sum = (arr: typeof bills, field: "amount" | "outstandingBalance" | "paidAmount") =>
     arr.reduce((acc, b) => acc + parseFloat(String(b[field] ?? 0)), 0);
@@ -68,6 +70,8 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     totalWalletBalance,
     paidTodayCount: paidToday.length,
     paidTodayAmount: sum(paidToday, "paidAmount"),
+    paidAllTimeCount: paidAllTime.length,
+    paidAllTimeAmount: sum(paidAllTime, "paidAmount"),
     partialPaymentsCount: partial.length,
     partialPaymentsAmount: sum(partial, "outstandingBalance"),
     unreadNotificationsCount: notifications.length,
@@ -77,7 +81,10 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
 router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const t = today();
-  const conditions = [eq(billsTable.scheduledDate, t)];
+  const conditions: ReturnType<typeof eq>[] = [
+    eq(billsTable.scheduledDate, t),
+    notInArray(billsTable.status, ["paid", "rejected"]),
+  ];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conditions));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.amount)), 0);
@@ -87,7 +94,10 @@ router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
 router.get("/dashboard/scheduled-tomorrow", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const tom = tomorrow();
-  const conditions = [eq(billsTable.scheduledDate, tom)];
+  const conditions: ReturnType<typeof eq>[] = [
+    eq(billsTable.scheduledDate, tom),
+    notInArray(billsTable.status, ["paid", "rejected"]),
+  ];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conditions));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.amount)), 0);
@@ -107,6 +117,19 @@ router.get("/dashboard/wallet-balances", async (_req, res): Promise<void> => {
   const wallets = await db.select().from(walletsTable);
   const totalBalance = wallets.reduce((a, w) => a + parseFloat(String(w.balance)), 0);
   res.json({ wallets: wallets.map(formatWallet), totalBalance });
+});
+
+router.get("/dashboard/payment-history", async (req, res): Promise<void> => {
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
+  const conditions: ReturnType<typeof eq>[] = [eq(billsTable.status, "paid")];
+  if (userId) conditions.push(eq(billsTable.createdBy, userId));
+  const bills = await db
+    .select()
+    .from(billsTable)
+    .where(and(...conditions))
+    .orderBy(desc(billsTable.paidAt));
+  const total = bills.reduce((a, b) => a + parseFloat(String(b.paidAmount ?? 0)), 0);
+  res.json({ bills: bills.map(formatBill), total });
 });
 
 router.get("/dashboard/activity", async (req, res): Promise<void> => {

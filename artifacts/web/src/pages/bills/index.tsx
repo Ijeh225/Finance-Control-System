@@ -59,18 +59,25 @@ export default function BillsList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(() => new URLSearchParams(rawSearch).get("status") ?? "all");
   const [priorityFilter, setPriorityFilter] = useState<string>(() => new URLSearchParams(rawSearch).get("priority") ?? "all");
+  const presetVendorId = new URLSearchParams(rawSearch).get("vendorId") ?? "";
 
   useEffect(() => {
     const params = new URLSearchParams(rawSearch);
     setStatusFilter(params.get("status") ?? "all");
     setPriorityFilter(params.get("priority") ?? "all");
+    const create = params.get("create");
+    const vid = params.get("vendorId") ?? "";
+    if (create === "1") {
+      setShowCreate(true);
+      if (vid) setForm(f => ({ ...f, vendorId: vid }));
+    }
   }, [rawSearch]);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(() => new URLSearchParams(rawSearch).get("create") === "1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const attachFileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
-    vendorId: "",
+    vendorId: presetVendorId,
     description: "",
     amount: "",
     scheduledDate: "",

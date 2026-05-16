@@ -14,7 +14,7 @@ import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, AlertCircle, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3, Users } from "lucide-react";
+import { Activity, AlertCircle, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3, Users, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -68,7 +68,6 @@ export default function Dashboard() {
   const { data: walletsData, isLoading: walletsLoading } = useGetWalletBalances({
     query: { queryKey: getGetWalletBalancesQueryKey() },
   });
-
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -256,6 +255,19 @@ export default function Dashboard() {
                 <CardContent>
                   <div className="text-2xl font-bold font-mono">{formatCurrency(summary.partialPaymentsAmount)}</div>
                   <p className="text-xs text-muted-foreground font-medium mt-1">{summary.partialPaymentsCount} bill{summary.partialPaymentsCount !== 1 ? "s" : ""} partially paid</p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/payment-history" className="block group" data-testid="card-payment-history">
+              <Card className="shadow-sm border-teal-500/20 group-hover:border-teal-500/40 transition-colors cursor-pointer h-full">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">All-Time Payments</CardTitle>
+                  <History className="w-4 h-4 text-teal-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.paidAllTimeAmount ?? 0)}</div>
+                  <p className="text-xs text-muted-foreground font-medium mt-1">{summary.paidAllTimeCount ?? 0} payment{(summary.paidAllTimeCount ?? 0) !== 1 ? "s" : ""} disbursed total</p>
                 </CardContent>
               </Card>
             </Link>

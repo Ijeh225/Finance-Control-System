@@ -367,6 +367,8 @@ export interface DashboardSummary {
   totalWalletBalance: number;
   paidTodayCount: number;
   paidTodayAmount: number;
+  paidAllTimeCount: number;
+  paidAllTimeAmount: number;
   partialPaymentsCount: number;
   partialPaymentsAmount: number;
   unreadNotificationsCount: number;
@@ -471,6 +473,18 @@ export type GetRecentActivity200 = {
   activities: AuditEntry[];
 };
 
+export type GetPaymentHistoryParams = {
+/**
+ * Filter by user ID (omit for all — MD only)
+ */
+userId?: string;
+};
+
+export type GetPaymentHistory200 = {
+  bills: Bill[];
+  total: number;
+};
+
 export type ListUsers200 = {
   users: User[];
 };
@@ -541,6 +555,11 @@ export type EscalateBillBody = {
 
 export type WithdrawBill200 = {
   success?: boolean;
+};
+
+export type RescheduleBillBody = {
+  /** New scheduled date in YYYY-MM-DD format */
+  scheduledDate: string;
 };
 
 export type ConfirmBillAttachment200 = {

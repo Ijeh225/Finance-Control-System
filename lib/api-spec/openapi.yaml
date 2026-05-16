@@ -196,6 +196,33 @@ paths:
                       $ref: "#/components/schemas/AuditEntry"
                 required: [activities]
 
+  /dashboard/payment-history:
+    get:
+      operationId: getPaymentHistory
+      tags: [dashboard]
+      summary: All paid bills (payment history), newest first
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: string
+          description: Filter by user ID (omit for all — MD only)
+      responses:
+        "200":
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bill"
+                  total:
+                    type: number
+                required: [bills, total]
+
   # ─── USERS ───────────────────────────────────────────────────
   /users:
     get:
@@ -618,6 +645,42 @@ paths:
           description: Not authorized to process payment
         "404":
           description: Bill or wallet not found
+
+  /bills/{id}/reschedule:
+    post:
+      operationId: rescheduleBill
+      tags: [bills]
+      summary: Reschedule a partial or approved bill to a new scheduled date
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scheduledDate:
+                  type: string
+                  description: New scheduled date in YYYY-MM-DD format
+              required: [scheduledDate]
+      responses:
+        "200":
+          description: Bill rescheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+        "400":
+          description: Validation error or invalid status
+        "403":
+          description: Forbidden
+        "404":
+          description: Bill not found
 
   # ─── ATTACHMENTS ──────────────────────────────────────────────
   /bills/{id}/attachments/request-upload:
@@ -2006,6 +2069,10 @@ components:
           type: integer
         paidTodayAmount:
           type: number
+        paidAllTimeCount:
+          type: integer
+        paidAllTimeAmount:
+          type: number
         partialPaymentsCount:
           type: integer
         partialPaymentsAmount:
@@ -2027,6 +2094,8 @@ components:
         - totalWalletBalance
         - paidTodayCount
         - paidTodayAmount
+        - paidAllTimeCount
+        - paidAllTimeAmount
         - partialPaymentsCount
         - partialPaymentsAmount
         - unreadNotificationsCount

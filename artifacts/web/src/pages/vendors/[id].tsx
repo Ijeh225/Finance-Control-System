@@ -7,7 +7,9 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, Building2, Phone, Mail, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Link } from "wouter";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
@@ -19,9 +21,12 @@ const STATUS_COLORS: Record<string, string> = {
   overdue: "bg-rose-500/10 text-rose-600 border-rose-500/20",
 };
 
+const ACTIVE_STATUSES = new Set(["pending", "approved", "partial", "on_hold", "overdue"]);
+
 export default function VendorDetail() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const { data: vendor, isLoading: vendorLoading } = useGetVendor(id!, {
     query: { enabled: !!id, queryKey: getGetVendorQueryKey(id!) },
@@ -49,6 +54,16 @@ export default function VendorDetail() {
     );
   }
 
+  const canAddJob = user?.role === "payment_assistant" || user?.role === "md";
+
+  const sortedBills = vendor.bills ? [...vendor.bills].sort((a, b) => {
+    const aActive = ACTIVE_STATUSES.has(a.status ?? "");
+    const bActive = ACTIVE_STATUSES.has(b.status ?? "");
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return 0;
+  }) : [];
+
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
       <Button variant="ghost" size="sm" onClick={() => setLocation("/vendors")} className="text-muted-foreground" data-testid="button-back-vendors">
@@ -74,7 +89,14 @@ export default function VendorDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {canAddJob && (
+            <Link href={`/bills?create=1&vendorId=${id}`}>
+              <Button size="sm" className="font-semibold" data-testid="button-add-job">
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Job
+              </Button>
+            </Link>
+          )}
           <a href={`/api/export/vendors/${id}/statement?format=excel`} download data-testid="button-export-vendor-excel">
             <Button size="sm" variant="outline" className="text-xs">
               <Download className="w-3.5 h-3.5 mr-1.5" /> Excel
@@ -88,7 +110,13 @@ export default function VendorDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="shadow-sm">
+          <CardContent className="pt-5">
+            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-1">Total Billed</p>
+            <p className="text-2xl font-bold font-mono">{formatCurrency(vendor.totalBilled ?? 0)}</p>
+          </CardContent>
+        </Card>
         <Card className="shadow-sm">
           <CardContent className="pt-5">
             <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-1">Total Paid</p>
@@ -97,7 +125,7 @@ export default function VendorDetail() {
         </Card>
         <Card className="shadow-sm">
           <CardContent className="pt-5">
-            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-1">Outstanding Balance</p>
+            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-1">Outstanding</p>
             <p className="text-2xl font-bold font-mono">{formatCurrency(vendor.outstandingBalance ?? 0)}</p>
           </CardContent>
         </Card>
@@ -143,24 +171,38 @@ export default function VendorDetail() {
         </Card>
       )}
 
-      {vendor.bills && vendor.bills.length > 0 && (
+      {sortedBills.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm uppercase tracking-wider font-semibold">Payment History</CardTitle>
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold">Bills</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
-              {vendor.bills.map((bill) => (
-                <div key={bill.id} className="p-4 flex items-center justify-between" data-testid={`row-vendor-bill-${bill.id}`}>
-                  <div>
-                    <p className="text-sm font-semibold">{bill.description || "Bill"}</p>
-                    <p className="text-xs text-muted-foreground font-mono">Due: {formatDate(bill.dueDate)}</p>
+              {sortedBills.map((bill) => (
+                <Link key={bill.id} href={`/bills/${bill.id}`}>
+                  <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group" data-testid={`row-vendor-bill-${bill.id}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold group-hover:text-primary transition-colors">{bill.description || "Bill"}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 mt-0.5 text-xs text-muted-foreground font-mono">
+                        <span>Sched: {formatDate(bill.scheduledDate)}</span>
+                        <span>Due: {formatDate(bill.dueDate)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <span className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</span>
+                        {bill.paidAmount != null && Number(bill.paidAmount) > 0 && Number(bill.paidAmount) !== Number(bill.amount) && (
+                          <p className="text-xs text-teal-600 font-mono">Paid: {formatCurrency(bill.paidAmount)}</p>
+                        )}
+                        {bill.outstandingBalance != null && Number(bill.outstandingBalance) > 0 && bill.status !== "paid" && (
+                          <p className="text-xs text-muted-foreground font-mono">Owing: {formatCurrency(bill.outstandingBalance)}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"]}`}>{bill.status?.replace("_", " ")}</span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</span>
-                    <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"]}`}>{bill.status?.replace("_", " ")}</span>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>
