@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db, billsTable, vendorsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -33,10 +33,14 @@ function formatBill(b: Record<string, unknown>) {
 
 router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
-  const conds = userId ? [eq(billsTable.createdBy, userId)] : [];
-  const bills = await db.select().from(billsTable).where(
-    and(...conds, sql`${billsTable.outstandingBalance} > 0`)
-  );
+  const { from, to } = req.query as { from?: string; to?: string };
+
+  const conds: ReturnType<typeof eq>[] = [sql`${billsTable.outstandingBalance} > 0` as unknown as ReturnType<typeof eq>];
+  if (userId) conds.push(eq(billsTable.createdBy, userId));
+  if (from) conds.push(gte(billsTable.dueDate, from) as unknown as ReturnType<typeof eq>);
+  if (to) conds.push(lte(billsTable.dueDate, to) as unknown as ReturnType<typeof eq>);
+
+  const bills = await db.select().from(billsTable).where(and(...conds));
   const vendors = await db.select().from(vendorsTable);
 
   const now = Date.now();
@@ -71,15 +75,20 @@ router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> =
     };
   });
 
-  const byUser = [...userMap.entries()].map(([userId, u]) => ({ userId, userName: u.name, total: u.total }));
+  const byUser = [...userMap.entries()].map(([uid, u]) => ({ userId: uid, userName: u.name, total: u.total }));
 
-  res.json({ totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser });
+  res.json({ totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser, bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)) });
 });
 
 router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
+  const { from, to } = req.query as { from?: string; to?: string };
+
   const conds = [eq(billsTable.status, "pending")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
+  if (from) conds.push(gte(billsTable.dueDate, from) as unknown as ReturnType<typeof eq>);
+  if (to) conds.push(lte(billsTable.dueDate, to) as unknown as ReturnType<typeof eq>);
+
   const bills = await db.select().from(billsTable).where(and(...conds));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.amount)), 0);
   res.json({ bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: bills.length });
@@ -87,19 +96,40 @@ router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
 
 router.get("/reports/paid-today", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
-  const t = today();
+  const { from, to } = req.query as { from?: string; to?: string };
+
   const conds = [eq(billsTable.status, "paid")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
+
   const bills = await db.select().from(billsTable).where(and(...conds));
-  const paidToday = bills.filter(b => b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
-  const total = paidToday.reduce((a, b) => a + parseFloat(String(b.paidAmount ?? 0)), 0);
-  res.json({ bills: paidToday.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: paidToday.length });
+
+  let filtered: typeof bills;
+  if (from || to) {
+    filtered = bills.filter(b => {
+      if (!b.updatedAt) return false;
+      const d = b.updatedAt.toISOString().split("T")[0]!;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  } else {
+    const t = today();
+    filtered = bills.filter(b => b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
+  }
+
+  const total = filtered.reduce((a, b) => a + parseFloat(String(b.paidAmount ?? 0)), 0);
+  res.json({ bills: filtered.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: filtered.length });
 });
 
 router.get("/reports/partial-payments", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
+  const { from, to } = req.query as { from?: string; to?: string };
+
   const conds = [eq(billsTable.status, "partial")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
+  if (from) conds.push(gte(billsTable.dueDate, from) as unknown as ReturnType<typeof eq>);
+  if (to) conds.push(lte(billsTable.dueDate, to) as unknown as ReturnType<typeof eq>);
+
   const bills = await db.select().from(billsTable).where(and(...conds));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.outstandingBalance ?? 0)), 0);
   res.json({ bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total });

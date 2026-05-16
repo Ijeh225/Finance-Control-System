@@ -1277,7 +1277,9 @@ export const ListAuditTrailResponse = zod.object({
  * @summary Outstanding liabilities with aging breakdown
  */
 export const GetOutstandingLiabilitiesQueryParams = zod.object({
-  "userId": zod.coerce.string().optional()
+  "userId": zod.coerce.string().optional(),
+  "from": zod.date().optional().describe('Filter bills with dueDate >= this date (YYYY-MM-DD)'),
+  "to": zod.date().optional().describe('Filter bills with dueDate <= this date (YYYY-MM-DD)')
 })
 
 export const GetOutstandingLiabilitiesResponse = zod.object({
@@ -1299,6 +1301,28 @@ export const GetOutstandingLiabilitiesResponse = zod.object({
   "userId": zod.string(),
   "userName": zod.string(),
   "total": zod.number()
+})),
+  "bills": zod.array(zod.object({
+  "id": zod.string(),
+  "vendorId": zod.string(),
+  "vendorName": zod.string(),
+  "description": zod.string(),
+  "amount": zod.number(),
+  "approvedAmount": zod.number().optional(),
+  "paidAmount": zod.number(),
+  "outstandingBalance": zod.number(),
+  "scheduledDate": zod.string(),
+  "dueDate": zod.string().optional(),
+  "walletId": zod.string().optional(),
+  "walletName": zod.string().optional(),
+  "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']),
+  "createdBy": zod.string(),
+  "createdByName": zod.string(),
+  "hasAttachment": zod.boolean().optional(),
+  "overdueDays": zod.number().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
 }))
 })
 
@@ -1307,7 +1331,9 @@ export const GetOutstandingLiabilitiesResponse = zod.object({
  * @summary All bills pending MD approval
  */
 export const GetPendingApprovalsQueryParams = zod.object({
-  "userId": zod.coerce.string().optional()
+  "userId": zod.coerce.string().optional(),
+  "from": zod.date().optional().describe('Filter bills with dueDate >= this date (YYYY-MM-DD)'),
+  "to": zod.date().optional().describe('Filter bills with dueDate <= this date (YYYY-MM-DD)')
 })
 
 export const GetPendingApprovalsResponse = zod.object({
@@ -1342,7 +1368,9 @@ export const GetPendingApprovalsResponse = zod.object({
  * @summary Total paid today summary
  */
 export const GetPaidTodayQueryParams = zod.object({
-  "userId": zod.coerce.string().optional()
+  "userId": zod.coerce.string().optional(),
+  "from": zod.date().optional().describe('Filter paid bills with updatedAt >= this date (YYYY-MM-DD); defaults to today'),
+  "to": zod.date().optional().describe('Filter paid bills with updatedAt <= this date (YYYY-MM-DD); defaults to today')
 })
 
 export const GetPaidTodayResponse = zod.object({
@@ -1377,7 +1405,9 @@ export const GetPaidTodayResponse = zod.object({
  * @summary All partial payment records
  */
 export const GetPartialPaymentsQueryParams = zod.object({
-  "userId": zod.coerce.string().optional()
+  "userId": zod.coerce.string().optional(),
+  "from": zod.date().optional().describe('Filter bills with dueDate >= this date (YYYY-MM-DD)'),
+  "to": zod.date().optional().describe('Filter bills with dueDate <= this date (YYYY-MM-DD)')
 })
 
 export const GetPartialPaymentsResponse = zod.object({

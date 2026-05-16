@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import {
   useListAuditTrail,
   getListAuditTrailQueryKey,
+  useListUsers,
+  getListUsersQueryKey,
   type AuditEntry,
 } from '@workspace/api-client-react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +23,18 @@ import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 
 const PAGE_SIZE = 30;
+
+const ACTION_FILTERS: { key: string | undefined; label: string }[] = [
+  { key: undefined, label: 'All' },
+  { key: 'created', label: 'Created' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'rejected', label: 'Rejected' },
+  { key: 'held', label: 'On Hold' },
+  { key: 'partial_approved', label: 'Partial' },
+  { key: 'escalated', label: 'Escalated' },
+  { key: 'commented', label: 'Comment' },
+  { key: 'edited', label: 'Edited' },
+];
 
 type ActionMeta = {
   label: string;
@@ -135,19 +150,46 @@ export default function AuditScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [actionFilter, setActionFilter] = useState<string | undefined>(undefined);
+  const [actorFilter, setActorFilter] = useState<string | undefined>(undefined);
   const isMd = user?.role === 'md';
 
-  const params = { limit };
-  const { data, isLoading, isFetching, refetch } = useListAuditTrail(
-    params,
-    { query: { queryKey: getListAuditTrailQueryKey(params), enabled: isMd } }
+  const { data: usersData } = useListUsers({
+    query: { queryKey: getListUsersQueryKey(), enabled: isMd },
+  });
+  const assistants = useMemo(
+    () => (usersData?.users ?? []).filter(u => u.isActive && u.role === 'payment_assistant'),
+    [usersData]
   );
+
+  const params = useMemo(
+    () => ({
+      limit,
+      ...(actionFilter ? { action: actionFilter } : {}),
+      ...(actorFilter ? { userId: actorFilter } : {}),
+    }),
+    [limit, actionFilter, actorFilter]
+  );
+
+  const { data, isLoading, isFetching, refetch } = useListAuditTrail(params, {
+    query: { queryKey: getListAuditTrailQueryKey(params), enabled: isMd },
+  });
 
   const entries = data?.entries ?? [];
   const hasMore = entries.length >= limit;
 
   const handleLoadMore = useCallback(() => {
     setLimit(prev => prev + PAGE_SIZE);
+  }, []);
+
+  const handleActionFilter = useCallback((key: string | undefined) => {
+    setActionFilter(key);
+    setLimit(PAGE_SIZE);
+  }, []);
+
+  const handleActorFilter = useCallback((id: string | undefined) => {
+    setActorFilter(id);
+    setLimit(PAGE_SIZE);
   }, []);
 
   if (!isMd) {
@@ -213,6 +255,128 @@ export default function AuditScreen() {
         </View>
       </View>
 
+      {/* Action type filter */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+        style={styles.filterScroll}
+      >
+        {ACTION_FILTERS.map(f => {
+          const active = actionFilter === f.key;
+          return (
+            <Pressable
+              key={f.key ?? '__all__'}
+              onPress={() => handleActionFilter(f.key)}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+              accessibilityLabel={`Filter by ${f.label}`}
+            >
+              <Text style={[styles.filterChipText, { color: active ? '#fff' : colors.mutedForeground }]}>
+                {f.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {/* Actor filter — only shown when there are assistants */}
+      {assistants.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={[styles.filterScroll, { marginTop: -4 }]}
+        >
+          <Pressable
+            onPress={() => handleActorFilter(undefined)}
+            style={[
+              styles.filterChip,
+              styles.actorChip,
+              {
+                backgroundColor: !actorFilter ? colors.primary + '20' : colors.card,
+                borderColor: !actorFilter ? colors.primary : colors.border,
+              },
+            ]}
+            accessibilityLabel="Show all team members"
+          >
+            <Feather
+              name="users"
+              size={12}
+              color={!actorFilter ? colors.primary : colors.mutedForeground}
+            />
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: !actorFilter ? colors.primary : colors.mutedForeground },
+              ]}
+            >
+              All
+            </Text>
+          </Pressable>
+          {assistants.map(a => {
+            const active = actorFilter === a.id;
+            const firstName = a.name.split(' ')[0] ?? a.name;
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => handleActorFilter(active ? undefined : a.id)}
+                style={[
+                  styles.filterChip,
+                  styles.actorChip,
+                  {
+                    backgroundColor: active ? colors.primary + '20' : colors.card,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+                accessibilityLabel={`Filter by ${a.name}`}
+              >
+                <Feather name="user" size={12} color={active ? colors.primary : colors.mutedForeground} />
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    { color: active ? colors.primary : colors.mutedForeground },
+                  ]}
+                >
+                  {firstName}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Active filter summary */}
+      {(actionFilter || actorFilter) && (
+        <View style={styles.activeFilterRow}>
+          <Feather name="filter" size={12} color={colors.mutedForeground} />
+          <Text style={[styles.activeFilterText, { color: colors.mutedForeground }]}>
+            {[
+              actionFilter
+                ? ACTION_FILTERS.find(f => f.key === actionFilter)?.label
+                : null,
+              actorFilter
+                ? assistants.find(a => a.id === actorFilter)?.name
+                : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+          <Pressable
+            onPress={() => { handleActionFilter(undefined); handleActorFilter(undefined); }}
+            style={styles.clearBtn}
+            accessibilityLabel="Clear all filters"
+          >
+            <Text style={[styles.clearBtnText, { color: colors.primary }]}>Clear</Text>
+          </Pressable>
+        </View>
+      )}
+
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 60 }} />
       ) : (
@@ -230,7 +394,7 @@ export default function AuditScreen() {
             <View style={styles.emptyState}>
               <Feather name="activity" size={48} color={colors.muted} />
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                No audit entries yet
+                {actionFilter || actorFilter ? 'No entries match these filters' : 'No audit entries yet'}
               </Text>
             </View>
           }
@@ -268,7 +432,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 12,
   },
   title: {
     fontSize: 32,
@@ -286,6 +450,50 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  filterScroll: {
+    flexGrow: 0,
+  },
+  filterRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    paddingBottom: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  actorChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  activeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  activeFilterText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  clearBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  clearBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 20,
@@ -373,5 +581,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });

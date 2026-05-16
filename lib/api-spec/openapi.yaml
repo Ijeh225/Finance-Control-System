@@ -1181,6 +1181,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate >= this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate <= this date (YYYY-MM-DD)
       responses:
         "200":
           description: Outstanding liabilities
@@ -1199,6 +1211,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate >= this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate <= this date (YYYY-MM-DD)
       responses:
         "200":
           description: Pending approvals
@@ -1227,6 +1251,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter paid bills with updatedAt >= this date (YYYY-MM-DD); defaults to today
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter paid bills with updatedAt <= this date (YYYY-MM-DD); defaults to today
       responses:
         "200":
           description: Paid today
@@ -1255,6 +1291,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate >= this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter bills with dueDate <= this date (YYYY-MM-DD)
       responses:
         "200":
           description: Partial payments
@@ -1990,4 +2038,8 @@ components:
               total:
                 type: number
             required: [userId, userName, total]
-      required: [totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser]
+        bills:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bill"
+      required: [totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser, bills]

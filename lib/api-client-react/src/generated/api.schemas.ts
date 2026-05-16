@@ -392,6 +392,7 @@ export interface LiabilitiesReport {
   aging30plus: number;
   byVendor: LiabilityAging[];
   byUser: LiabilitiesReportByUserItem[];
+  bills: Bill[];
 }
 
 export type GetDashboardSummaryParams = {
@@ -622,10 +623,26 @@ export type ListAuditTrail200 = {
 
 export type GetOutstandingLiabilitiesParams = {
 userId?: string;
+/**
+ * Filter bills with dueDate >= this date (YYYY-MM-DD)
+ */
+from?: string;
+/**
+ * Filter bills with dueDate <= this date (YYYY-MM-DD)
+ */
+to?: string;
 };
 
 export type GetPendingApprovalsParams = {
 userId?: string;
+/**
+ * Filter bills with dueDate >= this date (YYYY-MM-DD)
+ */
+from?: string;
+/**
+ * Filter bills with dueDate <= this date (YYYY-MM-DD)
+ */
+to?: string;
 };
 
 export type GetPendingApprovals200 = {
@@ -636,6 +653,14 @@ export type GetPendingApprovals200 = {
 
 export type GetPaidTodayParams = {
 userId?: string;
+/**
+ * Filter paid bills with updatedAt >= this date (YYYY-MM-DD); defaults to today
+ */
+from?: string;
+/**
+ * Filter paid bills with updatedAt <= this date (YYYY-MM-DD); defaults to today
+ */
+to?: string;
 };
 
 export type GetPaidToday200 = {
@@ -646,6 +671,14 @@ export type GetPaidToday200 = {
 
 export type GetPartialPaymentsParams = {
 userId?: string;
+/**
+ * Filter bills with dueDate >= this date (YYYY-MM-DD)
+ */
+from?: string;
+/**
+ * Filter bills with dueDate <= this date (YYYY-MM-DD)
+ */
+to?: string;
 };
 
 export type GetPartialPayments200 = {
