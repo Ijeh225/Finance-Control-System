@@ -3,6 +3,7 @@ import multer from "multer";
 import { eq, and } from "drizzle-orm";
 import { db, billAttachmentsTable, billsTable, notificationsTable, usersTable } from "@workspace/db";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { logger } from "../lib/logger";
 import { Readable } from "stream";
 
 const router: IRouter = Router();
@@ -34,9 +35,13 @@ function uid() {
 }
 
 /**
- * Fire "attachment uploaded" notifications:
- * - All MD users always receive a notification.
- * - If the uploader is not the bill creator, the bill creator also receives one.
+ * Fire "attachment uploaded" in-app notifications after a file is confirmed:
+ *   - Every MD-role user always receives a notification.
+ *   - If the uploader is not the bill creator, the bill creator also receives one.
+ *   - The uploader is never notified (they initiated the upload and already know).
+ *
+ * Notification body format: "New attachment on <bill description>: <filename>"
+ * The billId is stored on the notification so the Alerts tab can deep-link to the bill.
  */
 async function notifyAttachmentUploaded(
   billId: string,
@@ -48,20 +53,25 @@ async function notifyAttachmentUploaded(
   const title = "New Attachment";
   const body = `New attachment on ${billDescription}: ${fileName}`;
 
-  // Notify every MD user
+  // Collect all MD-role user IDs
   const mdUsers = await db.select({ id: usersTable.id })
     .from(usersTable)
     .where(eq(usersTable.role, "md"));
 
   const recipientIds = new Set<string>(mdUsers.map(u => u.id));
 
-  // Also notify the bill creator if they are not the uploader
+  // Also notify the bill creator if they are not the one uploading
   if (billCreatedBy !== uploaderId) {
     recipientIds.add(billCreatedBy);
   }
 
-  // Never notify the uploader (they already know about it)
+  // Never notify the uploader — they already know
   recipientIds.delete(uploaderId);
+
+  if (recipientIds.size === 0) {
+    logger.info({ billId, fileName }, "notifyAttachmentUploaded: no recipients, skipping");
+    return;
+  }
 
   for (const userId of recipientIds) {
     await db.insert(notificationsTable).values({
@@ -73,6 +83,8 @@ async function notifyAttachmentUploaded(
       billId,
     });
   }
+
+  logger.info({ billId, fileName, recipientCount: recipientIds.size }, "Attachment upload notifications sent");
 }
 
 /**
