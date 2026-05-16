@@ -82,6 +82,7 @@ function ActivityRow({
     <Pressable
       testID={`activity-row-${entry.id}`}
       onPress={() => onPress(entry)}
+      disabled={!canNavigate}
       style={({ pressed }) => [
         styles.activityRow,
         { borderBottomColor: colors.border },
