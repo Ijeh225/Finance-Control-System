@@ -389,12 +389,19 @@ router.post("/bills/:id/reschedule", async (req, res): Promise<void> => {
   const { scheduledDate } = req.body;
   if (!scheduledDate) { res.status(400).json({ error: "scheduledDate is required" }); return; }
 
-  // Only partial bills can be rescheduled; must be MD or a payment_assistant who is the creator
-  if (bill.status !== "partial") {
-    res.status(400).json({ error: "Only partial bills can be rescheduled" }); return;
+  // Only partial or approved bills can be rescheduled; must be MD or a payment_assistant who is the creator
+  if (!["partial", "approved"].includes(bill.status ?? "")) {
+    res.status(400).json({ error: "Only partial or approved bills can be rescheduled" }); return;
   }
   if (actor.role !== "md" && (actor.role !== "payment_assistant" || bill.createdBy !== actor.id)) {
     res.status(403).json({ error: "Only the payment assistant who created this bill or MD can reschedule" }); return;
+  }
+
+  // Validate scheduledDate is a valid ISO date strictly in the future
+  const parsedDate = new Date(scheduledDate);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (isNaN(parsedDate.getTime()) || parsedDate <= today) {
+    res.status(400).json({ error: "scheduledDate must be a valid date in the future" }); return;
   }
 
   const [updated] = await db

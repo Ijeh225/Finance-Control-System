@@ -300,8 +300,8 @@ export default function BillDetail() {
   const canPay = (user?.role === "payment_assistant" || isMd) &&
     ["approved", "partial"].includes(bill.status ?? "") &&
     (isMd || bill.createdBy === user?.id);
-  const canReschedule = bill.status === "partial" &&
-    (isMd || bill.createdBy === user?.id);
+  const canReschedule = ["partial", "approved"].includes(bill.status ?? "") &&
+    (isMd || (user?.role === "payment_assistant" && bill.createdBy === user?.id));
   const attachments = attachmentsData?.attachments ?? [];
 
   const selectedPayWallet = walletsData?.wallets?.find(w => w.id === payWalletId);
