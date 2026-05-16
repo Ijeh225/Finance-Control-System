@@ -13,6 +13,13 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-50 text-red-700",
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  approved: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+  partial: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+  on_hold: "bg-sky-500/10 text-sky-600 border-sky-500/20",
+};
+
 export default function ScheduledTomorrow() {
   const { user } = useAuth();
   const userId = user?.role !== "md" ? user?.id : undefined;
@@ -71,6 +78,7 @@ export default function ScheduledTomorrow() {
                       <p className="text-xs text-muted-foreground mt-0.5">{bill.description}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"] ?? "bg-muted text-muted-foreground border-border"}`}>{bill.status?.replace("_", " ")}</span>
                       <p className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</p>
                       <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                     </div>

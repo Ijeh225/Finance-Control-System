@@ -389,12 +389,12 @@ router.post("/bills/:id/reschedule", async (req, res): Promise<void> => {
   const { scheduledDate } = req.body;
   if (!scheduledDate) { res.status(400).json({ error: "scheduledDate is required" }); return; }
 
-  // Only partial or approved bills can be rescheduled; must be creator or MD
-  if (!["partial", "approved"].includes(bill.status ?? "")) {
-    res.status(400).json({ error: "Only partial or approved bills can be rescheduled" }); return;
+  // Only partial bills can be rescheduled; must be MD or a payment_assistant who is the creator
+  if (bill.status !== "partial") {
+    res.status(400).json({ error: "Only partial bills can be rescheduled" }); return;
   }
-  if (actor.role !== "md" && bill.createdBy !== actor.id) {
-    res.status(403).json({ error: "Only the bill creator or MD can reschedule" }); return;
+  if (actor.role !== "md" && (actor.role !== "payment_assistant" || bill.createdBy !== actor.id)) {
+    res.status(403).json({ error: "Only the payment assistant who created this bill or MD can reschedule" }); return;
   }
 
   const [updated] = await db

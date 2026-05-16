@@ -300,7 +300,7 @@ export default function BillDetail() {
   const canPay = (user?.role === "payment_assistant" || isMd) &&
     ["approved", "partial"].includes(bill.status ?? "") &&
     (isMd || bill.createdBy === user?.id);
-  const canReschedule = ["partial", "approved"].includes(bill.status ?? "") &&
+  const canReschedule = bill.status === "partial" &&
     (isMd || bill.createdBy === user?.id);
   const attachments = attachmentsData?.attachments ?? [];
 
@@ -560,7 +560,7 @@ export default function BillDetail() {
             onClick={() => { setRescheduleDate(bill.scheduledDate ?? ""); setShowReschedule(true); }}
             data-testid="button-reschedule-bill"
           >
-            <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Reschedule
+            <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Reschedule Remaining
           </Button>
           {bill.scheduledDate && (
             <span className="text-xs text-muted-foreground">Currently scheduled: <span className="font-semibold font-mono">{bill.scheduledDate}</span></span>
