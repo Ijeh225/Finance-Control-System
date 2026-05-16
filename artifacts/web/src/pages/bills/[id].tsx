@@ -5,7 +5,7 @@ import {
   useGetBill, getGetBillQueryKey,
   useGetBillComments, getGetBillCommentsQueryKey,
   useGetBillAudit, getGetBillAuditQueryKey,
-  useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill, useWithdrawBill,
+  useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill, useWithdrawBill, useDeleteBill,
   useAddBillComment,
   getListBillsQueryKey,
   useListBillAttachments, getListBillAttachmentsQueryKey,
@@ -88,6 +88,7 @@ export default function BillDetail() {
 
   const [showReschedule, setShowReschedule] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -160,6 +161,12 @@ export default function BillDetail() {
     mutation: {
       onSuccess: () => { qc.invalidateQueries({ queryKey: getListBillsQueryKey() }); toast({ title: "Bill withdrawn" }); setLocation("/bills"); },
       onError: () => toast({ title: "Failed to withdraw bill", variant: "destructive" }),
+    },
+  });
+  const deleteBill = useDeleteBill({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getListBillsQueryKey() }); toast({ title: "Bill permanently deleted" }); setLocation("/bills"); },
+      onError: () => toast({ title: "Failed to delete bill", variant: "destructive" }),
     },
   });
   const updateBill = useUpdateBill({
@@ -364,6 +371,18 @@ export default function BillDetail() {
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               {withdraw.isPending ? "Withdrawing…" : "Withdraw"}
+            </Button>
+          )}
+          {isMd && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={deleteBill.isPending}
+              data-testid="button-delete-bill"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete
             </Button>
           )}
         </div>
@@ -1038,6 +1057,31 @@ export default function BillDetail() {
               data-testid="button-confirm-edit"
             >
               {updateBill.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Bill?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently delete the bill for <strong>{bill?.vendorName}</strong> ({formatCurrency(bill?.amount ?? 0)}) and all associated comments, attachments, and audit records. Vendor totals will be reversed. This action cannot be undone.
+          </p>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteBill.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteBill.isPending}
+              data-testid="button-confirm-delete-bill"
+              onClick={() => deleteBill.mutate({ id: id! })}
+            >
+              {deleteBill.isPending ? "Deleting…" : "Yes, Delete Permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>

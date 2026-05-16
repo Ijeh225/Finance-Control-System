@@ -443,6 +443,34 @@ router.post("/bills/:id/reschedule", async (req, res): Promise<void> => {
   res.json(formatBill(updated as unknown as Record<string, unknown>));
 });
 
+// ─── Delete (MD only) ────────────────────────────────────────────────────────
+
+router.delete("/bills/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can delete bills" }); return; }
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
+  if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  // Reverse vendor financial totals
+  const amount = parseFloat(String(existing.amount));
+  const paidAmt = parseFloat(String(existing.paidAmount ?? 0));
+  const outstanding = parseFloat(String(existing.outstandingBalance ?? 0));
+  await db.update(vendorsTable).set({
+    totalBilled: sql`GREATEST(0, ${vendorsTable.totalBilled} - ${String(amount)})`,
+    totalPaid: paidAmt > 0 ? sql`GREATEST(0, ${vendorsTable.totalPaid} - ${String(paidAmt)})` : vendorsTable.totalPaid,
+    outstandingBalance: sql`GREATEST(0, ${vendorsTable.outstandingBalance} - ${String(outstanding)})`,
+  }).where(eq(vendorsTable.id, existing.vendorId));
+
+  // Delete all related records
+  await db.delete(commentsTable).where(eq(commentsTable.billId, rawId!));
+  await db.delete(auditTable).where(eq(auditTable.billId, rawId!));
+  await db.delete(billAttachmentsTable).where(eq(billAttachmentsTable.billId, rawId!));
+  await db.delete(billsTable).where(eq(billsTable.id, rawId!));
+  req.log.info({ billId: rawId, actor: actor.id }, "Bill deleted by MD");
+  res.json({ success: true });
+});
+
 // ─── Withdraw ────────────────────────────────────────────────────────────────
 
 router.post("/bills/:id/withdraw", async (req, res): Promise<void> => {

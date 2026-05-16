@@ -449,6 +449,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Bill"
+    delete:
+      operationId: deleteBill
+      tags: [bills]
+      summary: Permanently delete a bill (MD only). Reverses vendor totals.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
 
   /bills/{id}/approve:
     post:

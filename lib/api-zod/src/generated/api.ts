@@ -620,6 +620,18 @@ export const UpdateBillResponse = zod.object({
 
 
 /**
+ * @summary Permanently delete a bill (MD only). Reverses vendor totals.
+ */
+export const DeleteBillParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteBillResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
  * @summary Approve a bill
  */
 export const ApproveBillParams = zod.object({

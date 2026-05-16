@@ -530,6 +530,10 @@ export type ListBills200 = {
   total: number;
 };
 
+export type DeleteBill200 = {
+  success?: boolean;
+};
+
 export type ApproveBillBody = {
   comment?: string;
   approvedAmount?: number;
