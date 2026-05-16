@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -56,10 +56,15 @@ export default function BillsList() {
   const { toast } = useToast();
 
   const rawSearch = useSearch();
-  const urlParams = new URLSearchParams(rawSearch);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>(urlParams.get("status") ?? "all");
-  const [priorityFilter, setPriorityFilter] = useState<string>(urlParams.get("priority") ?? "all");
+  const [statusFilter, setStatusFilter] = useState<string>(() => new URLSearchParams(rawSearch).get("status") ?? "all");
+  const [priorityFilter, setPriorityFilter] = useState<string>(() => new URLSearchParams(rawSearch).get("priority") ?? "all");
+
+  useEffect(() => {
+    const params = new URLSearchParams(rawSearch);
+    setStatusFilter(params.get("status") ?? "all");
+    setPriorityFilter(params.get("priority") ?? "all");
+  }, [rawSearch]);
   const [showCreate, setShowCreate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -227,7 +232,7 @@ export default function BillsList() {
               </div>
               <h3 className="text-lg font-bold">No bills found</h3>
               <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                {search || statusFilter || priorityFilter ? "Try adjusting your filters." : "Submit a bill to get started."}
+                {search || (statusFilter !== "all") || (priorityFilter !== "all") ? "Try adjusting your filters." : "Submit a bill to get started."}
               </p>
             </div>
           ) : (
