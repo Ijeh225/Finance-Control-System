@@ -12,9 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bell, BellOff, CheckCheck,
   CheckCircle2, XCircle, CircleDashed, PauseCircle,
-  MessageCircle, AlertTriangle, Clock, Copy, ArrowUpCircle, Paperclip, Wallet,
+  MessageCircle, AlertTriangle, Clock, Copy, ArrowUpCircle, Paperclip, Wallet, ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import type { LucideIcon } from "lucide-react";
 
 interface IconConfig {
@@ -123,6 +124,16 @@ export default function Notifications() {
   });
 
   const unreadCount = data?.unreadCount ?? 0;
+  const [, setLocation] = useLocation();
+
+  function handleNotifClick(notif: { id: string; billId?: string | null; isRead?: boolean | null }) {
+    if (!notif.isRead) {
+      markRead.mutate({ id: notif.id });
+    }
+    if (notif.billId) {
+      setLocation(`/bills/${notif.billId}`);
+    }
+  }
 
   return (
     <div className="p-6 md:p-10 max-w-3xl mx-auto space-y-6">
@@ -174,37 +185,50 @@ export default function Notifications() {
             </div>
           ) : (
             <div className="divide-y">
-              {data.notifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`p-4 flex gap-4 transition-colors ${!notif.isRead ? "bg-primary/5" : "hover:bg-muted/30"}`}
-                  data-testid={`notification-${notif.id}`}
-                >
-                  <NotifIcon type={notif.type ?? ""} unread={!notif.isRead} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`text-sm font-semibold ${!notif.isRead ? "text-foreground" : "text-muted-foreground"}`}>{notif.title}</p>
-                        <p className="text-sm text-muted-foreground mt-0.5">{notif.body}</p>
-                        <p className="text-xs text-muted-foreground/60 font-mono mt-1">{formatDateTime(notif.createdAt)}</p>
+              {data.notifications.map((notif) => {
+                const isClickable = !!notif.billId;
+                return (
+                  <div
+                    key={notif.id}
+                    role={isClickable ? "button" : undefined}
+                    tabIndex={isClickable ? 0 : undefined}
+                    onClick={() => handleNotifClick(notif)}
+                    onKeyDown={(e) => e.key === "Enter" && handleNotifClick(notif)}
+                    className={`p-4 flex gap-4 transition-colors select-none
+                      ${!notif.isRead ? "bg-primary/5" : ""}
+                      ${isClickable ? "cursor-pointer hover:bg-primary/10 active:bg-primary/15" : "hover:bg-muted/30"}
+                    `}
+                    data-testid={`notification-${notif.id}`}
+                  >
+                    <NotifIcon type={notif.type ?? ""} unread={!notif.isRead} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`text-sm font-semibold ${!notif.isRead ? "text-foreground" : "text-muted-foreground"}`}>{notif.title}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{notif.body}</p>
+                          <p className="text-xs text-muted-foreground/60 font-mono mt-1">{formatDateTime(notif.createdAt)}</p>
+                        </div>
+                        {!notif.isRead && !isClickable && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 h-7 text-xs text-primary hover:text-primary"
+                            disabled={markRead.isPending}
+                            onClick={(e) => { e.stopPropagation(); markRead.mutate({ id: notif.id }); }}
+                            data-testid={`button-mark-read-${notif.id}`}
+                          >
+                            Mark read
+                          </Button>
+                        )}
                       </div>
-                      {!notif.isRead && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="shrink-0 h-7 text-xs text-primary hover:text-primary"
-                          disabled={markRead.isPending}
-                          onClick={() => markRead.mutate({ id: notif.id })}
-                          data-testid={`button-mark-read-${notif.id}`}
-                        >
-                          Mark read
-                        </Button>
-                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!notif.isRead && <div className="w-2 h-2 rounded-full bg-primary mt-0.5" />}
+                      {isClickable && <ChevronRight className="w-4 h-4 text-muted-foreground/40" />}
                     </div>
                   </div>
-                  {!notif.isRead && <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
