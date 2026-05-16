@@ -110,9 +110,20 @@ router.get("/dashboard/wallet-balances", async (_req, res): Promise<void> => {
 });
 
 router.get("/dashboard/activity", async (req, res): Promise<void> => {
-  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
+  const actor = req.user!;
   const limit = parseInt(String(req.query["limit"] ?? "20"));
-  const conditions = userId ? [eq(auditTable.userId, userId)] : [];
+
+  // MD: optionally filter by a specific user's bills; omit to see all.
+  // Non-MD: always scoped to bills THEY created (not just actions they performed),
+  // so they see MD approvals/holds/rejections on their own submissions.
+  let billOwnerFilter: ReturnType<typeof eq> | undefined;
+  if (actor.role === "md") {
+    const qUserId = req.query["userId"] as string | undefined;
+    if (qUserId) billOwnerFilter = eq(billsTable.createdBy, qUserId);
+  } else {
+    billOwnerFilter = eq(billsTable.createdBy, actor.id);
+  }
+
   const rows = await db
     .select({
       id: auditTable.id,
@@ -128,7 +139,7 @@ router.get("/dashboard/activity", async (req, res): Promise<void> => {
     })
     .from(auditTable)
     .leftJoin(billsTable, eq(auditTable.billId, billsTable.id))
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(billOwnerFilter)
     .orderBy(sql`${auditTable.createdAt} desc`)
     .limit(limit);
   res.json({ activities: rows });
