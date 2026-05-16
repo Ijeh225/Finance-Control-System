@@ -292,6 +292,15 @@ export default function BillDetail() {
   }
 
   const isMd = user?.role === "md";
+
+  // Derived amounts — must be computed before permission flags
+  const approvedAmt = bill.approvedAmount ?? bill.amount ?? 0;
+  const alreadyPaid = bill.paidAmount ?? 0;
+  const remainingApproved = Math.max(0, Number(approvedAmt) - Number(alreadyPaid));
+  const totalOutstanding = Number(bill.outstandingBalance ?? 0);
+  // True when partial payment was processed but no more approved funds remain — waiting for MD to approve next tranche
+  const awaitingNextApproval = bill.status === "partial" && remainingApproved <= 0.01 && totalOutstanding > 0.01;
+
   const canAct = isMd && ["pending", "on_hold", "partial", "overdue"].includes(bill.status ?? "");
   const canEdit = isMd
     ? !["approved", "paid"].includes(bill.status ?? "")
@@ -299,15 +308,13 @@ export default function BillDetail() {
   const canWithdraw = !isMd && bill.status === "pending" && bill.createdBy === user?.id;
   const canPay = (user?.role === "payment_assistant" || isMd) &&
     ["approved", "partial"].includes(bill.status ?? "") &&
-    (isMd || bill.createdBy === user?.id);
+    (isMd || bill.createdBy === user?.id) &&
+    remainingApproved > 0.01;
   const canReschedule = ["partial", "approved"].includes(bill.status ?? "") &&
     (isMd || (user?.role === "payment_assistant" && bill.createdBy === user?.id));
   const attachments = attachmentsData?.attachments ?? [];
 
   const selectedPayWallet = walletsData?.wallets?.find(w => w.id === payWalletId);
-  const approvedAmt = bill.approvedAmount ?? bill.amount ?? 0;
-  const alreadyPaid = bill.paidAmount ?? 0;
-  const remainingApproved = Math.max(0, Number(approvedAmt) - Number(alreadyPaid));
 
   const openEditDialog = () => {
     setEditForm({
@@ -448,7 +455,15 @@ export default function BillDetail() {
             )}
             {activeAction === "partial" && (
               <div className="space-y-3 pt-2 border-t">
-                <Input type="number" placeholder="Approved amount (NGN)" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="max-w-xs font-mono" data-testid="input-partial-amount" />
+                {Number(bill.paidAmount ?? 0) > 0 && (
+                  <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2 space-y-0.5">
+                    <p>Previously approved: <span className="font-semibold font-mono text-foreground">{formatCurrency(bill.approvedAmount ?? 0)}</span></p>
+                    <p>Already paid: <span className="font-semibold font-mono text-teal-700">{formatCurrency(bill.paidAmount ?? 0)}</span></p>
+                    <p>Still outstanding: <span className="font-semibold font-mono text-amber-700">{formatCurrency(totalOutstanding)}</span></p>
+                    <p className="text-[11px] text-muted-foreground/70 pt-0.5">Enter the <strong>additional</strong> amount you are approving for the next payment.</p>
+                  </div>
+                )}
+                <Input type="number" placeholder={Number(bill.paidAmount ?? 0) > 0 ? "Additional amount to approve (NGN)" : "Amount to approve (NGN)"} value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="max-w-xs font-mono" data-testid="input-partial-amount" />
                 <Textarea placeholder="Optional comment..." value={partialComment} onChange={(e) => setPartialComment(e.target.value)} rows={2} />
                 <div className="flex gap-2">
                   <Button size="sm" className="border-violet-300 bg-violet-600 hover:bg-violet-700 text-white" disabled={partialApprove.isPending || !partialAmount} onClick={() => partialApprove.mutate({ id: id!, data: { approvedAmount: Number(partialAmount), comment: partialComment || undefined } })} data-testid="button-confirm-partial">
@@ -565,10 +580,15 @@ export default function BillDetail() {
                 <p className="font-bold font-mono">{bill.scheduledDate ?? "Not set"}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Outstanding Balance</p>
-                <p className="font-bold font-mono text-amber-700">{formatCurrency(remainingApproved)}</p>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Total Outstanding</p>
+                <p className="font-bold font-mono text-amber-700">{formatCurrency(totalOutstanding)}</p>
               </div>
             </div>
+            {awaitingNextApproval && (
+              <div className="text-xs bg-violet-50 border border-violet-200 rounded p-2.5 text-violet-800">
+                All approved funds have been disbursed. <span className="font-semibold">{formatCurrency(totalOutstanding)}</span> remains outstanding — reschedule the next payment date below and await further MD approval.
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               <Button
                 size="sm"
@@ -888,7 +908,7 @@ export default function BillDetail() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Set a new scheduled date for the remaining balance of <span className="font-semibold text-foreground">{formatCurrency(remainingApproved)}</span>.
+              Set a new scheduled date for the outstanding balance of <span className="font-semibold text-foreground">{formatCurrency(totalOutstanding)}</span>.
             </p>
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">New Scheduled Date *</Label>

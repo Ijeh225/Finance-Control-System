@@ -223,15 +223,24 @@ router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   const actor = req.user!;
   if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can partially approve bills" }); return; }
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
-  const { approvedAmount, comment } = req.body ?? {};
-  if (!approvedAmount) { res.status(400).json({ error: "approvedAmount is required" }); return; }
+  const { approvedAmount: additionalApproved, comment } = req.body ?? {};
+  if (!additionalApproved) { res.status(400).json({ error: "approvedAmount is required" }); return; }
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
-  const outstanding = parseFloat(String(existing.amount)) - approvedAmount;
-  const [bill] = await db.update(billsTable).set({ status: "partial", approvedAmount: String(approvedAmount), outstandingBalance: String(outstanding) }).where(eq(billsTable.id, rawId!)).returning();
-  await addAudit(rawId!, actor.id, actor.name, "partial_approved", comment ?? `Partial payment approved: ${approvedAmount}`, String(existing.amount), String(approvedAmount));
+  const totalAmount = parseFloat(String(existing.amount));
+  const prevApproved = parseFloat(String(existing.approvedAmount ?? 0));
+  const alreadyPaid = parseFloat(String(existing.paidAmount ?? 0));
+  // Accumulate approved amounts across multiple rounds
+  const newApprovedTotal = prevApproved + additionalApproved;
+  if (newApprovedTotal > totalAmount + 0.01) {
+    res.status(400).json({ error: `Total approved amount (${newApprovedTotal}) cannot exceed bill amount (${totalAmount})` }); return;
+  }
+  // Outstanding = what remains unpaid on the full bill
+  const outstanding = Math.max(0, totalAmount - alreadyPaid);
+  const [bill] = await db.update(billsTable).set({ status: "partial", approvedAmount: String(newApprovedTotal), outstandingBalance: String(outstanding) }).where(eq(billsTable.id, rawId!)).returning();
+  await addAudit(rawId!, actor.id, actor.name, "partial_approved", comment ?? `Additional ${additionalApproved} approved — total approved: ${newApprovedTotal}`, String(prevApproved), String(newApprovedTotal));
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
-  await notify(existing.createdBy, "bill_partial", "Partial Approval ✓", `Your bill for ${existing.vendorName} has been partially approved for ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(approvedAmount)}. Tap to process payment.`, rawId!);
+  await notify(existing.createdBy, "bill_partial", "Partial Approval ✓", `Your bill for ${existing.vendorName} has been approved for an additional ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(additionalApproved)} (total approved: ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(newApprovedTotal)}). Tap to process payment.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -284,7 +293,8 @@ router.post("/bills/:id/pay", async (req, res): Promise<void> => {
 
   const newPaidAmount = alreadyPaid + payAmount;
   const newOutstanding = parseFloat(String(existing.amount)) - newPaidAmount;
-  const isFullyPaid = newPaidAmount >= approvedAmount - 0.01;
+  // Bill is fully paid only when total paid >= full bill amount (not just approved amount)
+  const isFullyPaid = newPaidAmount >= parseFloat(String(existing.amount)) - 0.01;
   const newStatus = isFullyPaid ? "paid" : "partial";
 
   const prevBalance = walletBalance;
