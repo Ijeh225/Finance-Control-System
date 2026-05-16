@@ -588,6 +588,37 @@ paths:
                   success:
                     type: boolean
 
+  /bills/{id}/pay:
+    post:
+      operationId: processBillPayment
+      tags: [bills]
+      summary: Process payment for an approved or partial bill (Payment Assistant)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessPaymentInput"
+      responses:
+        "200":
+          description: Bill marked paid and transaction recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bill"
+        "400":
+          description: Validation error or insufficient wallet balance
+        "403":
+          description: Not authorized to process payment
+        "404":
+          description: Bill or wallet not found
+
   # ─── ATTACHMENTS ──────────────────────────────────────────────
   /bills/{id}/attachments/request-upload:
     post:
@@ -1568,6 +1599,18 @@ components:
           type: string
         updatedAt:
           type: string
+        paidBy:
+          type: string
+        paidByName:
+          type: string
+        paidAt:
+          type: string
+        paymentReference:
+          type: string
+        paidWalletId:
+          type: string
+        paidWalletName:
+          type: string
       required:
         - id
         - vendorId
@@ -1642,6 +1685,19 @@ components:
         priority:
           type: string
           enum: [low, medium, high, urgent]
+
+    ProcessPaymentInput:
+      type: object
+      properties:
+        walletId:
+          type: string
+        amount:
+          type: number
+        paymentReference:
+          type: string
+        narration:
+          type: string
+      required: [walletId, amount]
 
     Vendor:
       type: object

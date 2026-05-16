@@ -78,6 +78,7 @@ import type {
   MarkAllNotificationsReadBody,
   Notification,
   PartialApproveBillBody,
+  ProcessPaymentInput,
   RejectBillBody,
   RequestAttachmentUploadInput,
   RequestAttachmentUploadResponse,
@@ -1859,6 +1860,78 @@ export const useWithdrawBill = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getWithdrawBillMutationOptions(options));
+    }
+
+export const getProcessBillPaymentUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/pay`
+}
+
+/**
+ * @summary Process payment for an approved or partial bill (Payment Assistant)
+ */
+export const processBillPayment = async (id: string,
+    processPaymentInput: ProcessPaymentInput, options?: RequestInit): Promise<Bill> => {
+
+  return customFetch<Bill>(getProcessBillPaymentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      processPaymentInput,)
+  }
+);}
+
+
+
+
+export const getProcessBillPaymentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processBillPayment>>, TError,{id: string;data: BodyType<ProcessPaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof processBillPayment>>, TError,{id: string;data: BodyType<ProcessPaymentInput>}, TContext> => {
+
+const mutationKey = ['processBillPayment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof processBillPayment>>, {id: string;data: BodyType<ProcessPaymentInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  processBillPayment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProcessBillPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof processBillPayment>>>
+    export type ProcessBillPaymentMutationBody = BodyType<ProcessPaymentInput>
+    export type ProcessBillPaymentMutationError = ErrorType<void>
+
+    /**
+ * @summary Process payment for an approved or partial bill (Payment Assistant)
+ */
+export const useProcessBillPayment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof processBillPayment>>, TError,{id: string;data: BodyType<ProcessPaymentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof processBillPayment>>,
+        TError,
+        {id: string;data: BodyType<ProcessPaymentInput>},
+        TContext
+      > => {
+      return useMutation(getProcessBillPaymentMutationOptions(options));
     }
 
 export const getRequestBillAttachmentUploadUrl = (id: string,) => {

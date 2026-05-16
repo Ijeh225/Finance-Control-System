@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
-import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable } from "@workspace/db";
+import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -185,24 +185,7 @@ router.post("/bills/:id/approve", async (req, res): Promise<void> => {
   const [bill] = await db.update(billsTable).set({ status: "approved", approvedAmount: String(debitAmount) }).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "approved", comment ?? "Bill approved");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
-  await notify(existing.createdBy, "bill_approved", "Bill Approved", `Your bill for ${existing.vendorName} has been approved.`, rawId!);
-
-  if (existing.walletId) {
-    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, existing.walletId));
-    if (wallet) {
-      const prevBalance = parseFloat(String(wallet.balance));
-      const newBalance = prevBalance - debitAmount;
-      await db.update(walletsTable).set({ balance: String(newBalance) }).where(eq(walletsTable.id, wallet.id));
-      await db.insert(walletTransactionsTable).values({
-        id: uid(), walletId: wallet.id, type: "bill_payment",
-        amount: String(debitAmount), balanceBefore: String(prevBalance), balanceAfter: String(newBalance),
-        narration: `Bill payment: ${existing.vendorName}`,
-        initiatedBy: actor.id, initiatedByName: actor.name,
-        relatedWalletId: null, relatedWalletName: null, relatedBillId: rawId!,
-      });
-    }
-  }
-
+  await notify(existing.createdBy, "bill_approved", "Bill Approved ✓", `Your bill for ${existing.vendorName} (${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(debitAmount)}) has been approved. Tap to process payment.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -248,25 +231,134 @@ router.post("/bills/:id/partial-approve", async (req, res): Promise<void> => {
   const [bill] = await db.update(billsTable).set({ status: "partial", approvedAmount: String(approvedAmount), outstandingBalance: String(outstanding) }).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "partial_approved", comment ?? `Partial payment approved: ${approvedAmount}`, String(existing.amount), String(approvedAmount));
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
-  await notify(existing.createdBy, "bill_partial", "Partial Approval", `Your bill for ${existing.vendorName} has been partially approved.`, rawId!);
+  await notify(existing.createdBy, "bill_partial", "Partial Approval ✓", `Your bill for ${existing.vendorName} has been partially approved for ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(approvedAmount)}. Tap to process payment.`, rawId!);
+  res.json(formatBill(bill as unknown as Record<string, unknown>));
+});
 
-  if (existing.walletId) {
-    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, existing.walletId));
-    if (wallet) {
-      const prevBalance = parseFloat(String(wallet.balance));
-      const debitAmount = parseFloat(String(approvedAmount));
-      const newBalance = prevBalance - debitAmount;
-      await db.update(walletsTable).set({ balance: String(newBalance) }).where(eq(walletsTable.id, wallet.id));
-      await db.insert(walletTransactionsTable).values({
-        id: uid(), walletId: wallet.id, type: "bill_payment",
-        amount: String(debitAmount), balanceBefore: String(prevBalance), balanceAfter: String(newBalance),
-        narration: `Partial bill payment: ${existing.vendorName}`,
-        initiatedBy: actor.id, initiatedByName: actor.name,
-        relatedWalletId: null, relatedWalletName: null, relatedBillId: rawId!,
-      });
-    }
+// ─── Process Payment (Payment Assistant) ────────────────────────────────────
+
+router.post("/bills/:id/pay", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+
+  const { bill: existing, forbidden } = await loadBill(rawId!, actor);
+  if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Only payment_assistant (or MD) can trigger this; must be the creator or MD
+  if (actor.role !== "md" && actor.role !== "payment_assistant") {
+    res.status(403).json({ error: "Only Payment Assistants or the MD can process payments" }); return;
   }
 
+  // Bill must be in approved or partial state
+  if (!["approved", "partial"].includes(existing.status)) {
+    res.status(400).json({ error: `Cannot process payment for a bill with status '${existing.status}'` }); return;
+  }
+
+  const { walletId, amount, paymentReference, narration } = req.body ?? {};
+  if (!walletId || !amount) {
+    res.status(400).json({ error: "walletId and amount are required" }); return;
+  }
+
+  const payAmount = parseFloat(String(amount));
+  if (isNaN(payAmount) || payAmount <= 0) {
+    res.status(400).json({ error: "amount must be a positive number" }); return;
+  }
+
+  // Load and validate wallet
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, walletId));
+  if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+
+  const walletBalance = parseFloat(String(wallet.balance));
+  if (walletBalance < payAmount) {
+    res.status(400).json({ error: `Insufficient wallet balance. Available: ${walletBalance.toFixed(2)}, Required: ${payAmount.toFixed(2)}` }); return;
+  }
+
+  // Validate against approved amount
+  const approvedAmount = parseFloat(String(existing.approvedAmount ?? existing.amount));
+  const alreadyPaid = parseFloat(String(existing.paidAmount ?? 0));
+  const remainingApproved = approvedAmount - alreadyPaid;
+  if (payAmount > remainingApproved + 0.01) {
+    res.status(400).json({ error: `Payment amount exceeds approved outstanding. Approved remaining: ${remainingApproved.toFixed(2)}` }); return;
+  }
+
+  const newPaidAmount = alreadyPaid + payAmount;
+  const newOutstanding = parseFloat(String(existing.amount)) - newPaidAmount;
+  const isFullyPaid = newPaidAmount >= approvedAmount - 0.01;
+  const newStatus = isFullyPaid ? "paid" : "partial";
+
+  const prevBalance = walletBalance;
+  const newBalance = prevBalance - payAmount;
+  const now = new Date();
+  const ref = paymentReference || `FC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${uid().slice(0, 6).toUpperCase()}`;
+  const txNarration = narration || `Payment to ${existing.vendorName} — Ref: ${ref}`;
+
+  // 1. Debit wallet
+  await db.update(walletsTable)
+    .set({ balance: String(newBalance) })
+    .where(eq(walletsTable.id, wallet.id));
+
+  // 2. Record wallet transaction
+  await db.insert(walletTransactionsTable).values({
+    id: uid(),
+    walletId: wallet.id,
+    type: "bill_payment",
+    amount: String(payAmount),
+    balanceBefore: String(prevBalance),
+    balanceAfter: String(newBalance),
+    narration: txNarration,
+    initiatedBy: actor.id,
+    initiatedByName: actor.name,
+    relatedWalletId: null,
+    relatedWalletName: null,
+    relatedBillId: rawId!,
+  });
+
+  // 3. Update bill
+  const [bill] = await db.update(billsTable).set({
+    status: newStatus,
+    paidAmount: String(newPaidAmount),
+    outstandingBalance: String(Math.max(0, newOutstanding)),
+    paidBy: actor.id,
+    paidByName: actor.name,
+    paidAt: now,
+    paymentReference: ref,
+    paidWalletId: wallet.id,
+    paidWalletName: wallet.name,
+  }).where(eq(billsTable.id, rawId!)).returning();
+
+  // 4. Update vendor totals
+  await db.update(vendorsTable).set({
+    totalPaid: sql`${vendorsTable.totalPaid} + ${String(payAmount)}`,
+    outstandingBalance: sql`GREATEST(0, ${vendorsTable.outstandingBalance} - ${String(payAmount)})`,
+  }).where(eq(vendorsTable.id, existing.vendorId));
+
+  // 5. Audit
+  const statusLabel = isFullyPaid ? "paid in full" : "partial payment processed";
+  await addAudit(
+    rawId!,
+    actor.id,
+    actor.name,
+    "payment_processed",
+    `${statusLabel} — ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(payAmount)} from ${wallet.name} (Ref: ${ref})`,
+    String(alreadyPaid),
+    String(newPaidAmount),
+  );
+
+  // 6. Notify MD
+  const [mdUser] = await db.select().from(usersTable).where(eq(usersTable.role, "md"));
+  if (mdUser) {
+    const fmt = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(n);
+    await notify(
+      mdUser.id,
+      "payment_processed",
+      `Payment Processed — ${existing.vendorName}`,
+      `${actor.name} processed ${fmt(payAmount)} to ${existing.vendorName} from ${wallet.name}. Ref: ${ref}. Remaining: ${fmt(Math.max(0, newOutstanding))}.`,
+      rawId!,
+    );
+  }
+
+  req.log.info({ billId: rawId, actor: actor.id, amount: payAmount, wallet: wallet.id, ref }, "Payment processed");
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 

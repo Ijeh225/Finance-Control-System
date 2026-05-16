@@ -15,6 +15,7 @@ import {
   useUpdateBill,
   useListWallets, getListWalletsQueryKey,
   useListVendors, getListVendorsQueryKey,
+  useProcessBillPayment,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
@@ -31,6 +32,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpCircle,
   ChevronLeft, MessageSquare, Activity, User, Send,
   Paperclip, Upload, Download, Trash2, FileText, Pencil,
+  Wallet, CreditCard, BadgeCheck, Hash,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -74,6 +76,12 @@ export default function BillDetail() {
   const [partialComment, setPartialComment] = useState("");
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const [showPayDialog, setShowPayDialog] = useState(false);
+  const [payWalletId, setPayWalletId] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payReference, setPayReference] = useState("");
+  const [payNarration, setPayNarration] = useState("");
 
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -156,6 +164,22 @@ export default function BillDetail() {
         toast({ title: "Bill updated" });
       },
       onError: () => toast({ title: "Failed to update bill", variant: "destructive" }),
+    },
+  });
+
+  const processPayment = useProcessBillPayment({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
+        setShowPayDialog(false);
+        setPayWalletId(""); setPayAmount(""); setPayReference(""); setPayNarration("");
+        toast({ title: "Payment processed successfully", description: "The bill has been marked paid and the transaction recorded." });
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: "Payment failed", description: msg ?? "Please check wallet balance and try again.", variant: "destructive" });
+      },
     },
   });
 
@@ -253,7 +277,15 @@ export default function BillDetail() {
     ? !["approved", "paid"].includes(bill.status ?? "")
     : bill.status === "pending" && bill.createdBy === user?.id;
   const canWithdraw = !isMd && bill.status === "pending" && bill.createdBy === user?.id;
+  const canPay = (user?.role === "payment_assistant" || isMd) &&
+    ["approved", "partial"].includes(bill.status ?? "") &&
+    (isMd || bill.createdBy === user?.id);
   const attachments = attachmentsData?.attachments ?? [];
+
+  const selectedPayWallet = walletsData?.wallets?.find(w => w.id === payWalletId);
+  const approvedAmt = bill.approvedAmount ?? bill.amount ?? 0;
+  const alreadyPaid = bill.paidAmount ?? 0;
+  const remainingApproved = Math.max(0, Number(approvedAmt) - Number(alreadyPaid));
 
   const openEditDialog = () => {
     setEditForm({
@@ -415,6 +447,83 @@ export default function BillDetail() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment Confirmation — shown once bill is paid */}
+      {bill.status === "paid" && bill.paidAt && (
+        <Card className="shadow-sm border-teal-500/30 bg-teal-500/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold text-teal-700 flex items-center gap-2">
+              <BadgeCheck className="w-4 h-4" /> Payment Confirmed
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Amount Paid</p>
+                <p className="font-bold font-mono text-teal-700">{formatCurrency(bill.paidAmount ?? 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Outstanding</p>
+                <p className="font-bold font-mono">{formatCurrency(bill.outstandingBalance ?? 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Payment Date</p>
+                <p className="font-semibold">{formatDateTime(bill.paidAt)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Processed By</p>
+                <p className="font-semibold">{bill.paidByName ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Wallet Used</p>
+                <p className="font-semibold">{bill.paidWalletName ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Reference</p>
+                <p className="font-mono text-xs tracking-wide">{bill.paymentReference ?? "—"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Process Payment — shown to PA/MD when bill is approved or partial */}
+      {canPay && (
+        <Card className="shadow-sm border-emerald-500/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold text-emerald-700 flex items-center gap-2">
+              <CreditCard className="w-4 h-4" /> Process Payment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm bg-muted/40 rounded p-3 border border-border/50">
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Total Bill</p>
+                <p className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Approved Amount</p>
+                <p className="font-bold font-mono text-emerald-700">{formatCurrency(approvedAmt)}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Remaining to Pay</p>
+                <p className="font-bold font-mono text-amber-700">{formatCurrency(remainingApproved)}</p>
+              </div>
+            </div>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              onClick={() => {
+                setPayAmount(String(remainingApproved));
+                setPayWalletId(bill.walletId ?? "");
+                setShowPayDialog(true);
+              }}
+              data-testid="button-process-payment"
+            >
+              <Wallet className="w-4 h-4 mr-2" /> Process Payment
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -585,6 +694,118 @@ export default function BillDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Process Payment Dialog */}
+      <Dialog open={showPayDialog} onOpenChange={setShowPayDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600" /> Process Payment
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="p-3 bg-muted/50 rounded border text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Vendor</span>
+                <span className="font-semibold">{bill.vendorName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Approved</span>
+                <span className="font-semibold font-mono text-emerald-700">{formatCurrency(approvedAmt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Remaining</span>
+                <span className="font-semibold font-mono text-amber-700">{formatCurrency(remainingApproved)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                <Wallet className="w-3 h-3 inline mr-1" /> Wallet / Account *
+              </Label>
+              <Select value={payWalletId} onValueChange={setPayWalletId}>
+                <SelectTrigger data-testid="select-pay-wallet">
+                  <SelectValue placeholder="Select wallet to debit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {walletsData?.wallets?.map(w => (
+                    <SelectItem key={w.id} value={w.id}>
+                      <span className="font-medium">{w.name}</span>
+                      <span className="ml-2 text-muted-foreground font-mono text-xs">{formatCurrency(w.balance ?? 0)}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedPayWallet && (
+                <p className="text-xs text-muted-foreground">
+                  Available balance: <span className="font-mono font-semibold">{formatCurrency(selectedPayWallet.balance ?? 0)}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                className="font-mono"
+                max={remainingApproved}
+                data-testid="input-pay-amount"
+              />
+              <p className="text-xs text-muted-foreground">Max payable: <span className="font-mono font-semibold">{formatCurrency(remainingApproved)}</span></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                <Hash className="w-3 h-3 inline mr-1" /> Payment Reference
+              </Label>
+              <Input
+                placeholder="Auto-generated if left blank"
+                value={payReference}
+                onChange={(e) => setPayReference(e.target.value)}
+                data-testid="input-pay-reference"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration / Note</Label>
+              <Input
+                placeholder={`Payment to ${bill.vendorName}`}
+                value={payNarration}
+                onChange={(e) => setPayNarration(e.target.value)}
+                data-testid="input-pay-narration"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowPayDialog(false)}>Cancel</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={
+                processPayment.isPending ||
+                !payWalletId ||
+                !payAmount ||
+                Number(payAmount) <= 0 ||
+                Number(payAmount) > remainingApproved + 0.01
+              }
+              onClick={() => processPayment.mutate({
+                id: id!,
+                data: {
+                  walletId: payWalletId,
+                  amount: Number(payAmount),
+                  paymentReference: payReference || undefined,
+                  narration: payNarration || undefined,
+                },
+              })}
+              data-testid="button-confirm-payment"
+            >
+              {processPayment.isPending ? "Processing..." : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
         <DialogContent className="max-w-lg">

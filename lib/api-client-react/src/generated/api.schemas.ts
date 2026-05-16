@@ -140,6 +140,12 @@ export interface Bill {
   overdueDays?: number;
   createdAt: string;
   updatedAt?: string;
+  paidBy?: string;
+  paidByName?: string;
+  paidAt?: string;
+  paymentReference?: string;
+  paidWalletId?: string;
+  paidWalletName?: string;
 }
 
 export type UserProfile = User & {
@@ -231,6 +237,13 @@ export interface UpdateBillInput {
   dueDate?: string;
   walletId?: string;
   priority?: UpdateBillInputPriority;
+}
+
+export interface ProcessPaymentInput {
+  walletId: string;
+  amount: number;
+  paymentReference?: string;
+  narration?: string;
 }
 
 export type VendorDetail = Vendor & {

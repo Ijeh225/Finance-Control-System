@@ -1,0 +1,96 @@
+Like I explained earlier, this application should function around an internal wallet/banking structure. It should not behave like an ordinary expense tracker alone. The system should work more like a medium-scale accounting and internal banking platform.
+
+For example:
+
+When a Payment Assistant creates and submits a bill, the bill should go to the MD for review and approval. Once the MD approves the bill, the assigned Payment Assistant should immediately receive a notification.
+
+That notification should:
+
+* Appear inside the Notification Center
+* Be clickable
+* Redirect the user directly to the approved bill/payment page
+
+From that approved bill page, the Payment Assistant should then be able to process the payment directly using the assigned internal wallet/bank account inside the platform.
+
+This means the platform is not only tracking expenses — it is also acting like an internal payment processing and treasury management system.
+
+The payment workflow should look like this:
+
+Payment Assistant creates bill
+↓
+Bill goes to MD for review
+↓
+MD approves or comments
+↓
+Payment Assistant receives notification
+↓
+Payment Assistant opens approved bill
+↓
+Payment Assistant selects internal wallet/account
+↓
+Payment is processed
+↓
+System updates vendor balance automatically
+↓
+Transaction history is recorded
+
+The system should maintain complete financial records such as:
+
+* Payment history
+* Wallet balances
+* Outstanding liabilities
+* Vendor balances
+* Partial payments
+* Approval history
+* Audit trail
+
+The vendor/beneficiary structure should also behave more like an accounting ledger.
+
+For example:
+If Lucy is owed ₦200,000 and we pay ₦50,000, the system should automatically show:
+
+* Total Bill
+* Total Paid
+* Outstanding Balance
+* Remaining Liability
+
+The vendor page should not just display simple figures like:
+
+* Total Paid
+* Outstanding Balance
+* Bank Details
+
+Instead, the vendor page should function more like a proper accounting or banking package interface.
+
+Each vendor profile should contain:
+
+* Running balance
+* Statement history
+* List of jobs/work done
+* Expense descriptions
+* Payment history
+* Partial payment history
+* Transaction timeline
+* Wallet/account used for payment
+* Approval history
+* MD comments
+* Attached invoices/proofs
+* Outstanding liabilities
+* Last payment date
+
+The overall system should feel like:
+
+* A medium-scale accounting package
+* A treasury management platform
+* An internal banking/payment processing system
+
+The structure should focus heavily on:
+
+* Financial tracking
+* Payment processing
+* Vendor liability management
+* Wallet/account movement
+* Internal transaction records
+* Executive approval workflow
+
+The goal is to create a smart executive treasury control system where bills can be reviewed, approved, paid, tracked, and reconciled completely inside the platform.
