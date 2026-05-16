@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -44,6 +44,19 @@ async function loadBill(billId: string, actor: Actor) {
 
 // ─── List ────────────────────────────────────────────────────────────────────
 
+// ─── Auto-overdue helper ──────────────────────────────────────────────────────
+// Flips any pending bill whose scheduledDate is in the past to "overdue".
+// Called before every list/dashboard fetch so the status is always current.
+async function markOverdueBills(userId?: string): Promise<void> {
+  const t = new Date().toISOString().split("T")[0]!;
+  const conditions: ReturnType<typeof eq>[] = [
+    eq(billsTable.status, "pending"),
+    lt(billsTable.scheduledDate, t),
+  ];
+  if (userId) conditions.push(eq(billsTable.createdBy, userId));
+  await db.update(billsTable).set({ status: "overdue" }).where(and(...conditions));
+}
+
 router.get("/bills", async (req, res): Promise<void> => {
   const actor = req.user!;
   const query = req.query as Record<string, string>;
@@ -51,6 +64,9 @@ router.get("/bills", async (req, res): Promise<void> => {
 
   // Non-MD: always scoped to their own bills; ignore client-supplied userId
   const effectiveUserId = actor.role === "md" ? query["userId"] : actor.id;
+
+  // Auto-flag any pending bills with a past scheduled date
+  await markOverdueBills(effectiveUserId);
 
   const conditions: ReturnType<typeof eq>[] = [];
   if (effectiveUserId) conditions.push(eq(billsTable.createdBy, effectiveUserId));

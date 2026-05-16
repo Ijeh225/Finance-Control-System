@@ -31,6 +31,11 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const t = today();
   const tom = tomorrow();
 
+  // Auto-flag pending bills with past scheduled dates as overdue
+  const overdueConditions = [eq(billsTable.status, "pending"), lt(billsTable.scheduledDate, t)];
+  if (userId) overdueConditions.push(eq(billsTable.createdBy, userId));
+  await db.update(billsTable).set({ status: "overdue" }).where(and(...overdueConditions));
+
   const [bills, wallets, notifications] = await Promise.all([
     db.select().from(billsTable).where(userFilter),
     db.select().from(walletsTable),

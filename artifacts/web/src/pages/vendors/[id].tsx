@@ -1,15 +1,24 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   useGetVendor, getGetVendorQueryKey,
   useGetVendorLiabilities, getGetVendorLiabilitiesQueryKey,
+  useUpdateBill,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
@@ -27,12 +36,34 @@ export default function VendorDetail() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Add Expense dialog state
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [addMode, setAddMode] = useState<"existing" | "new">("existing");
+  const [addAmount, setAddAmount] = useState("");
+  const [addNote, setAddNote] = useState("");
 
   const { data: vendor, isLoading: vendorLoading } = useGetVendor(id!, {
     query: { enabled: !!id, queryKey: getGetVendorQueryKey(id!) },
   });
   const { data: liabilities, isLoading: liabLoading } = useGetVendorLiabilities(id!, {
     query: { enabled: !!id, queryKey: getGetVendorLiabilitiesQueryKey(id!) },
+  });
+
+  const updateBill = useUpdateBill({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetVendorQueryKey(id!) });
+        queryClient.invalidateQueries({ queryKey: getGetVendorLiabilitiesQueryKey(id!) });
+        setShowAddExpense(false);
+        setAddAmount("");
+        setAddNote("");
+        toast({ title: "Expense added to existing bill" });
+      },
+      onError: () => toast({ title: "Failed to update bill", variant: "destructive" }),
+    },
   });
 
   if (vendorLoading) {
@@ -63,6 +94,35 @@ export default function VendorDetail() {
     if (!aActive && bActive) return 1;
     return 0;
   }) : [];
+
+  // Pending bills are the candidates to add an expense to
+  const pendingBills = sortedBills.filter(b => b.status === "pending");
+  const targetPendingBill = pendingBills[0];
+
+  const openAddExpense = () => {
+    setAddMode(targetPendingBill ? "existing" : "new");
+    setAddAmount("");
+    setAddNote("");
+    setShowAddExpense(true);
+  };
+
+  const handleAddExpenseConfirm = () => {
+    if (addMode === "new" || !targetPendingBill) {
+      setShowAddExpense(false);
+      setLocation(`/bills?create=1&vendorId=${id}`);
+      return;
+    }
+    const extra = Number(addAmount);
+    if (!extra || extra <= 0) return;
+    const newTotal = Number(targetPendingBill.amount ?? 0) + extra;
+    const newDescription = addNote
+      ? `${targetPendingBill.description ?? "Expense"}; ${addNote}`
+      : undefined;
+    updateBill.mutate({
+      id: targetPendingBill.id!,
+      data: { amount: newTotal, ...(newDescription ? { description: newDescription } : {}) },
+    });
+  };
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
@@ -180,11 +240,9 @@ export default function VendorDetail() {
                 <p className="text-xs text-muted-foreground mt-0.5">Every expense added for this vendor accumulates here. Outstanding balance reflects what remains unpaid across all jobs.</p>
               </div>
               {canAddJob && (
-                <Link href={`/bills?create=1&vendorId=${id}`}>
-                  <Button size="sm" variant="outline" className="shrink-0 text-xs" data-testid="button-add-job-ledger">
-                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Expense
-                  </Button>
-                </Link>
+                <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={openAddExpense} data-testid="button-add-job-ledger">
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Expense
+                </Button>
               )}
             </div>
           </CardHeader>
@@ -235,6 +293,97 @@ export default function VendorDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* Add Expense Dialog */}
+      <Dialog open={showAddExpense} onOpenChange={setShowAddExpense}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Expense — {vendor.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-1">
+            {/* Mode selection — only shown when a pending bill exists */}
+            {targetPendingBill && (
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Where should this expense go?</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddMode("existing")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${addMode === "existing" ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted/40"}`}
+                  >
+                    <p className="text-sm font-semibold">Add to existing bill</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">{formatCurrency(targetPendingBill.amount ?? 0)} pending</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddMode("new")}
+                    className={`rounded-lg border p-3 text-left transition-colors ${addMode === "new" ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted/40"}`}
+                  >
+                    <p className="text-sm font-semibold">Create new bill</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Separate payment request</p>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing bill summary */}
+            {addMode === "existing" && targetPendingBill && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
+                <p className="font-semibold text-amber-900">{targetPendingBill.description || "Existing bill"}</p>
+                <p className="text-xs text-amber-700 font-mono">Current amount: {formatCurrency(targetPendingBill.amount ?? 0)}</p>
+                {addAmount && Number(addAmount) > 0 && (
+                  <p className="text-xs font-semibold text-amber-800 font-mono border-t border-amber-200 pt-1 mt-1">
+                    New total: {formatCurrency(Number(targetPendingBill.amount ?? 0) + Number(addAmount))}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Amount — shown for "add to existing" mode */}
+            {addMode === "existing" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Additional Amount (NGN) *</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 4563"
+                    value={addAmount}
+                    onChange={e => setAddAmount(e.target.value)}
+                    className="font-mono"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Note (optional)</Label>
+                  <Input
+                    placeholder="What is this additional charge for?"
+                    value={addNote}
+                    onChange={e => setAddNote(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* CTA */}
+            <div className="flex gap-2 pt-1">
+              {addMode === "existing" ? (
+                <Button
+                  className="flex-1"
+                  disabled={!addAmount || Number(addAmount) <= 0 || updateBill.isPending}
+                  onClick={handleAddExpenseConfirm}
+                >
+                  {updateBill.isPending ? "Saving…" : `Add ${addAmount ? formatCurrency(Number(addAmount)) : "amount"} to bill`}
+                </Button>
+              ) : (
+                <Button className="flex-1" onClick={handleAddExpenseConfirm}>
+                  Continue to new bill
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setShowAddExpense(false)}>Cancel</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
