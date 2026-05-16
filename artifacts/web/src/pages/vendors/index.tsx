@@ -40,7 +40,7 @@ export default function Vendors() {
     },
   });
 
-  const isMd = user?.role === "md";
+  const canOperate = user?.role === "md" || user?.role === "payment_assistant";
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-6">
@@ -49,7 +49,7 @@ export default function Vendors() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Vendors</h1>
           <p className="text-muted-foreground text-sm font-medium">Beneficiaries and payment counterparties.</p>
         </div>
-        {isMd && (
+        {canOperate && (
           <Button className="font-semibold shadow-sm" onClick={() => setShowCreate(true)} data-testid="button-create-vendor">
             <Plus className="w-4 h-4 mr-2" /> Add Vendor
           </Button>

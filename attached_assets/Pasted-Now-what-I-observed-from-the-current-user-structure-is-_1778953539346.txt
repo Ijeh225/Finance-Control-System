@@ -1,0 +1,59 @@
+Now, what I observed from the current user structure is that the Payment Assistants are too limited in access. For example, I noticed that a Payment Assistant cannot create or manage vendors/beneficiaries. That setup is not what we want for this platform.
+
+The main purpose of this system is to reduce stress for the MD, not increase it. The MD should not be responsible for operational tasks such as:
+
+* Creating vendors
+* Adding beneficiaries
+* Creating expenses
+* Uploading invoices
+* Scheduling bills
+* Managing payment records
+* Updating liabilities
+
+All those operational responsibilities should belong to the Payment Assistants.
+
+The MD’s role should mainly be:
+
+* Reviewing scheduled payments
+* Viewing pending approvals
+* Checking outstanding liabilities
+* Reviewing user activities
+* Making comments or instructions
+* Approving, rejecting, or holding payments
+
+The workflow should be simple for the MD.
+
+For example:
+Once the MD comes to the office and logs into the platform, all he should need to do is:
+
+* Navigate to a particular user such as Mr. A, Mr. B, or Mr. C
+* Open that user’s pending jobs/payments
+* Review the scheduled bills
+* Make comments or approvals
+
+Example comments:
+
+* Approved
+* Pay ₦50,000 first
+* Hold till tomorrow
+* Confirm invoice
+* Use another wallet/account
+
+Once the MD comments or approves anything, the assigned Payment Assistant should immediately receive a notification on their dashboard.
+
+The Payment Assistants should handle almost all operational and financial preparation work inside the system, including:
+
+* Creating vendors/beneficiaries
+* Managing vendor balances
+* Creating expenses
+* Uploading proofs/documents
+* Scheduling payments
+* Managing wallets/accounts
+* Recording transactions
+* Processing partial payments
+* Updating liabilities
+* Preparing bills for MD review
+
+The MD should function more like an executive reviewer and approval authority, not the person handling day-to-day financial data entry.
+
+Please restructure the permissions and workflow to allocate most operational responsibilities to the Payment Assistants while keeping the MD dashboard focused on review, visibility, approvals, comments, and financial oversight.

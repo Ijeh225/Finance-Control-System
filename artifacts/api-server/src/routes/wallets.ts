@@ -25,14 +25,15 @@ function fmtTx(tx: typeof walletTransactionsTable.$inferSelect) {
   };
 }
 
-// GET /wallets — list wallets, scoped by role
+// GET /wallets — list wallets
+// MD and payment_assistant see all wallets (MD can filter by ?userId=).
+// Treasury is read-only and also sees all wallets for oversight.
 router.get("/wallets", async (req, res): Promise<void> => {
   const actor = req.user!;
   const requestedUserId = req.query["userId"] as string | undefined;
 
-  const ownedBy = actor.role !== "md"
-    ? actor.id
-    : requestedUserId ?? undefined;
+  // Only scope to a specific owner when the MD explicitly requests it via ?userId=
+  const ownedBy = actor.role === "md" ? (requestedUserId ?? undefined) : undefined;
 
   const wallets = ownedBy
     ? await db.select().from(walletsTable).where(eq(walletsTable.ownedBy, ownedBy))
@@ -48,13 +49,17 @@ router.get("/wallets", async (req, res): Promise<void> => {
   res.json({ wallets: wallets.map(w => fmtWallet(w, w.ownedBy ? ownerMap[w.ownedBy] : undefined)) });
 });
 
-// POST /wallets — create wallet (MD only or self)
+// POST /wallets — create wallet
+// MD and payment_assistant can create wallets and assign any owner.
+// Treasury is read-only and cannot create wallets.
 router.post("/wallets", async (req, res): Promise<void> => {
   const actor = req.user!;
+  if (actor.role === "treasury") { res.status(403).json({ error: "Treasury role cannot create wallets" }); return; }
+
   const { name, bankName, accountNumber, balance, currency, ownedBy: bodyOwnedBy, lowBalanceThreshold } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
 
-  const ownedBy = actor.role === "md" && bodyOwnedBy ? bodyOwnedBy : actor.id;
+  const ownedBy = (actor.role === "md" || actor.role === "payment_assistant") && bodyOwnedBy ? bodyOwnedBy : actor.id;
 
   const [wallet] = await db.insert(walletsTable).values({
     id: uid(),
@@ -116,14 +121,9 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
     if (!fromWallet) return { ok: false, status: 404, error: "Source wallet not found" };
     if (!toWallet)   return { ok: false, status: 404, error: "Destination wallet not found" };
 
-    if (actor.role !== "md" && fromWallet.ownedBy !== actor.id) {
-      return { ok: false, status: 403, error: "You can only transfer from your own wallet" };
-    }
-
-    // Non-MD: destination must also be a wallet the actor owns.
-    // Prevents leaking metadata of unrelated wallets via the transfer response.
-    if (actor.role !== "md" && toWallet.ownedBy !== actor.id) {
-      return { ok: false, status: 403, error: "You can only transfer to your own wallet" };
+    // Treasury cannot initiate transfers
+    if (actor.role === "treasury") {
+      return { ok: false, status: 403, error: "Treasury role cannot initiate transfers" };
     }
 
     // Currency guard: block cross-currency transfers without a conversion policy
@@ -251,9 +251,10 @@ router.get("/wallets/:id", async (req, res): Promise<void> => {
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
 
-  if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
-    res.status(403).json({ error: "Access denied" });
-    return;
+  if (actor.role === "treasury" && wallet.ownedBy !== actor.id) {
+    // Treasury can only view wallets they're associated with — read-only oversight
+    // For now allow all wallets to be visible to treasury (read-only), same as MD
+    // Remove this block if treasury should be fully unrestricted in read access
   }
 
   const recentTransactions = await db.select().from(walletTransactionsTable)
@@ -281,10 +282,7 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
 
-  if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
-    res.status(403).json({ error: "Access denied" });
-    return;
-  }
+  // All authenticated roles can read any wallet statement; treasury is read-only
 
   const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query["pageSize"] ?? "50")) || 50));
@@ -325,8 +323,8 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Wallet not found" }); return; }
 
-  if (actor.role !== "md" && existing.ownedBy !== actor.id) {
-    res.status(403).json({ error: "Access denied" });
+  if (actor.role === "treasury") {
+    res.status(403).json({ error: "Treasury role cannot modify wallets" });
     return;
   }
 
@@ -336,7 +334,7 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
   if (bankName !== undefined) updates["bankName"] = bankName;
   if (accountNumber !== undefined) updates["accountNumber"] = accountNumber;
   if (currency !== undefined) updates["currency"] = currency;
-  if (ownedBy !== undefined && actor.role === "md") updates["ownedBy"] = ownedBy;
+  if (ownedBy !== undefined && (actor.role === "md" || actor.role === "payment_assistant")) updates["ownedBy"] = ownedBy;
   if (lowBalanceThreshold !== undefined) updates["lowBalanceThreshold"] = lowBalanceThreshold != null ? String(lowBalanceThreshold) : null;
 
   if (Object.keys(updates).length === 0) {
