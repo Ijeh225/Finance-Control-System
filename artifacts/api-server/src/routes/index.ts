@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { requireAuth } from "../lib/requireAuth";
 import healthRouter from "./health";
+import adminWipeRouter from "./admin-wipe";
 import authRouter from "./auth";
 import dashboardRouter from "./dashboard";
 import usersRouter from "./users";
@@ -19,6 +20,7 @@ const router: IRouter = Router();
 // Public routes — no auth required
 router.use(healthRouter);
 router.use(authRouter);
+router.use(adminWipeRouter);
 
 // All routes below require a valid session
 router.use(requireAuth);
