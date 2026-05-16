@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { UserProvider } from "@/context/UserContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { UploadQueueProvider } from "@/context/UploadQueueContext";
 
 // Set base URL for API calls
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
@@ -104,11 +105,13 @@ export default function RootLayout() {
         <UserProvider>
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
+              <UploadQueueProvider>
+                <GestureHandlerRootView>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </UploadQueueProvider>
             </QueryClientProvider>
           </ErrorBoundary>
         </UserProvider>

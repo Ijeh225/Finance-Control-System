@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, ActivityIndicator, Platform,
   Pressable, Alert, Modal, TextInput, KeyboardAvoidingView,
 } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { useColors } from '@/hooks/useColors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -34,6 +35,7 @@ import { PriorityBadge } from '@/components/finance/PriorityBadge';
 import { ActionSheet, ActionOption } from '@/components/finance/ActionSheet';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/context/AuthContext';
+import { useUploadQueue, isRetryableUploadError } from '@/context/UploadQueueContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -137,6 +139,18 @@ export default function BillDetailScreen() {
   const vendors = vendorsData?.vendors ?? [];
   const wallets = walletsData?.wallets ?? [];
 
+  const { queue, enqueue } = useUploadQueue();
+  const pendingUploads = queue.filter((q) => q.billId === billId);
+
+  const prevPendingCountRef = useRef(pendingUploads.length);
+  useEffect(() => {
+    if (prevPendingCountRef.current > 0 && pendingUploads.length < prevPendingCountRef.current) {
+      refetchAttachments();
+      queryClient.invalidateQueries({ queryKey: getListBillAttachmentsQueryKey(billId) });
+    }
+    prevPendingCountRef.current = pendingUploads.length;
+  }, [pendingUploads.length]);
+
   const isMd = authUser?.role === 'md';
   const canAttach = authUser?.role === 'md' || authUser?.role === 'payment_assistant';
   const attachments = attachmentsData?.attachments ?? [];
@@ -225,6 +239,12 @@ export default function BillDetailScreen() {
   ];
 
   const handleAttachFile = async () => {
+    // Pick the file first (separate try so errors here show distinct messages)
+    let pickedFileName = '';
+    let pickedFileUri = '';
+    let pickedMimeType = '';
+    let pickedFileSize: number | null = null;
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: [
@@ -244,38 +264,61 @@ export default function BillDetailScreen() {
       const asset = result.assets[0];
       if (!asset) return;
 
-      const mimeType = asset.mimeType ?? 'application/octet-stream';
-      const fileSize = asset.size ?? null;
-      const fileName = asset.name;
+      pickedFileName = asset.name;
+      pickedFileUri = asset.uri;
+      pickedMimeType = asset.mimeType ?? 'application/octet-stream';
+      pickedFileSize = asset.size ?? null;
+    } catch {
+      Alert.alert('File Error', 'Could not open the file picker. Please try again.');
+      return;
+    }
 
-      if (!ALLOWED_MIME_TYPES.has(mimeType)) {
-        Alert.alert('Invalid File Type', 'Please attach a PDF, image, Word, Excel, or CSV file.');
-        return;
-      }
+    if (!ALLOWED_MIME_TYPES.has(pickedMimeType)) {
+      Alert.alert('Invalid File Type', 'Please attach a PDF, image, Word, Excel, or CSV file.');
+      return;
+    }
 
-      if (fileSize !== null && fileSize > MAX_FILE_SIZE) {
-        Alert.alert('File Too Large', 'The file must be smaller than 20 MB.');
-        return;
-      }
+    if (pickedFileSize !== null && pickedFileSize > MAX_FILE_SIZE) {
+      Alert.alert('File Too Large', 'The file must be smaller than 20 MB.');
+      return;
+    }
 
-      setIsUploading(true);
+    // Check connectivity before attempting upload
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      await enqueue({
+        billId,
+        fileName: pickedFileName,
+        fileUri: pickedFileUri,
+        mimeType: pickedMimeType,
+        fileSize: pickedFileSize,
+      });
+      Alert.alert(
+        'Queued',
+        `${pickedFileName} will upload automatically when you're back online.`,
+      );
+      return;
+    }
 
+    setIsUploading(true);
+
+    try {
       // Step 1: request presigned upload URL
       const uploadResp = await requestUploadMutation.mutateAsync({
         id: billId,
-        data: { fileName, fileSize: fileSize ?? undefined, mimeType },
+        data: { fileName: pickedFileName, fileSize: pickedFileSize ?? undefined, mimeType: pickedMimeType },
       });
 
       const { attachmentId, uploadUrl } = uploadResp;
 
       // Step 2: fetch file as blob and PUT to presigned URL with progress tracking
-      const fileRes = await fetch(asset.uri);
+      const fileRes = await fetch(pickedFileUri);
       const blob = await fileRes.blob();
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', mimeType);
+        xhr.setRequestHeader('Content-Type', pickedMimeType);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -301,9 +344,25 @@ export default function BillDetailScreen() {
       ]);
 
       Platform.OS !== 'web' && Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Uploaded', `${fileName} attached successfully.`);
-    } catch {
-      Alert.alert('Upload Failed', 'Could not upload the file. Please try again.');
+      Alert.alert('Uploaded', `${pickedFileName} attached successfully.`);
+    } catch (err) {
+      if (isRetryableUploadError(err)) {
+        // Network or server failure — queue for automatic retry when back online
+        await enqueue({
+          billId,
+          fileName: pickedFileName,
+          fileUri: pickedFileUri,
+          mimeType: pickedMimeType,
+          fileSize: pickedFileSize,
+        });
+        Alert.alert(
+          'Queued',
+          `${pickedFileName} will upload automatically when you're back online.`,
+        );
+      } else {
+        // Permanent failure (auth/validation) — inform the user and don't queue
+        Alert.alert('Upload Failed', 'Could not upload the file. Please check your session and try again.');
+      }
     } finally {
       setIsUploading(false);
       setUploadProgress(null);
@@ -436,7 +495,7 @@ export default function BillDetailScreen() {
         <View>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Attachments{attachments.length > 0 ? ` (${attachments.length})` : ''}
+              Attachments{(attachments.length + pendingUploads.length) > 0 ? ` (${attachments.length + pendingUploads.length})` : ''}
             </Text>
             {canAttach && (
               <Pressable
@@ -465,7 +524,31 @@ export default function BillDetailScreen() {
             </View>
           )}
 
-          {attachments.length === 0 ? (
+          {pendingUploads.length > 0 && (
+            <View style={[styles.attachmentList, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 8 }]}>
+              {pendingUploads.map((pending, index) => (
+                <View
+                  key={pending.id}
+                  style={[
+                    styles.attachmentRow,
+                    index < pendingUploads.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                  ]}
+                >
+                  <View style={styles.attachmentInfo}>
+                    <Text style={[styles.attachmentName, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {pending.fileName}
+                    </Text>
+                    <Text style={[styles.attachmentMeta, { color: '#F59E0B' }]}>
+                      Queued — will upload when online
+                    </Text>
+                  </View>
+                  <ActivityIndicator size="small" color="#F59E0B" />
+                </View>
+              ))}
+            </View>
+          )}
+
+          {attachments.length === 0 && pendingUploads.length === 0 ? (
             <View style={[styles.emptyAttachments, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No attachments yet</Text>
             </View>
