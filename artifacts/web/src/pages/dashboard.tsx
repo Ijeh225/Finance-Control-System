@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
@@ -7,12 +8,13 @@ import {
   useGetOverdueBills, getGetOverdueBillsQueryKey,
   useGetRecentActivity, getGetRecentActivityQueryKey,
   useGetWalletBalances, getGetWalletBalancesQueryKey,
+  useListUsers, getListUsersQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, AlertCircle, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3 } from "lucide-react";
+import { Activity, AlertCircle, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,8 +36,18 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const userId = user?.role !== "md" ? user?.id : undefined;
-  const params = userId ? { userId } : undefined;
+  const isMd = user?.role === "md";
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+
+  // For non-MD users, always scope to own data. For MD, use the selected assistant (or undefined = all).
+  const scopedUserId = isMd ? selectedUserId : user?.id;
+  const params = scopedUserId ? { userId: scopedUserId } : undefined;
+
+  const { data: usersData } = useListUsers({
+    query: { queryKey: getListUsersQueryKey(), enabled: isMd },
+  });
+  const assistants = (usersData?.users ?? []).filter(u => u.isActive && u.role === "payment_assistant");
+  const selectedAssistant = assistants.find(a => a.id === selectedUserId);
 
   const { data: summary, isLoading: summaryLoading } = useGetDashboardSummary(params, {
     query: { queryKey: getGetDashboardSummaryQueryKey(params) },
@@ -59,12 +71,57 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Command Center</h1>
-        <p className="text-muted-foreground text-sm font-medium">
-          Good day, <span className="text-foreground font-semibold">{user?.name}</span>. Real-time treasury overview.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Command Center</h1>
+          <p className="text-muted-foreground text-sm font-medium">
+            Good day, <span className="text-foreground font-semibold">{user?.name}</span>. Real-time treasury overview.
+          </p>
+        </div>
+        {selectedAssistant && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs font-semibold self-start">
+            <User className="w-3.5 h-3.5" />
+            Viewing {selectedAssistant.name}&apos;s data
+          </div>
+        )}
       </div>
+
+      {/* MD Assistant View Switcher */}
+      {isMd && assistants.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Users className="w-3.5 h-3.5" /> View As
+          </div>
+          <div className="flex flex-wrap gap-2" data-testid="assistant-view-switcher">
+            <button
+              onClick={() => setSelectedUserId(undefined)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                !selectedUserId
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+              }`}
+              data-testid="view-all"
+            >
+              All Assistants
+            </button>
+            {assistants.map(a => (
+              <button
+                key={a.id}
+                onClick={() => setSelectedUserId(prev => prev === a.id ? undefined : a.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  selectedUserId === a.id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+                }`}
+                data-testid={`view-assistant-${a.id}`}
+              >
+                {a.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
 
       {/* Summary Cards — 9-card KPI grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
