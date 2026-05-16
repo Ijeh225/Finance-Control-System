@@ -138,7 +138,7 @@ router.get("/dashboard/activity", async (req, res): Promise<void> => {
       createdAt: auditTable.createdAt,
     })
     .from(auditTable)
-    .leftJoin(billsTable, eq(auditTable.billId, billsTable.id))
+    .innerJoin(billsTable, eq(auditTable.billId, billsTable.id))
     .where(billOwnerFilter)
     .orderBy(sql`${auditTable.createdAt} desc`)
     .limit(limit);
