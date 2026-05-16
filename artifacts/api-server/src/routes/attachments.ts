@@ -266,9 +266,11 @@ router.post("/bills/:id/attachments/:attachmentId/confirm", async (req, res): Pr
     .set({ hasAttachment: true })
     .where(eq(billsTable.id, billId));
 
-  // Only notify on the first confirmation to prevent duplicate alerts
+  // Only notify on the first confirmation to prevent duplicate alerts.
+  // Pass attachment.uploadedBy (not actor.id) so recipient logic reflects
+  // who actually uploaded the file, not who confirmed it.
   if (!alreadyConfirmed) {
-    await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, actor.id, attachment.fileName);
+    await notifyAttachmentUploaded(billId, bill.description, bill.createdBy, attachment.uploadedBy, attachment.fileName);
   }
 
   res.json({ ok: true });
