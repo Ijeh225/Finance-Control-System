@@ -1,13 +1,118 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  Platform,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
-import { useGetDashboardSummary, getGetDashboardSummaryQueryKey, useListUsers } from '@workspace/api-client-react';
+import {
+  useGetDashboardSummary,
+  getGetDashboardSummaryQueryKey,
+  useGetRecentActivity,
+  getGetRecentActivityQueryKey,
+  useListUsers,
+  type AuditEntry,
+} from '@workspace/api-client-react';
 import { useUser } from '@/context/UserContext';
 import { useAuth } from '@/context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmountText } from '@/components/finance/AmountText';
 import { router } from 'expo-router';
+
+function formatRelative(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days === 1) return 'yesterday';
+  return `${days}d ago`;
+}
+
+type ActionMeta = { label: string; icon: keyof typeof Feather.glyphMap; color: string };
+
+function getActionMeta(action: string, colors: ReturnType<typeof useColors>): ActionMeta {
+  switch (action) {
+    case 'created':
+      return { label: 'Submitted', icon: 'plus-circle', color: '#6366F1' };
+    case 'edited':
+      return { label: 'Edited', icon: 'edit-2', color: colors.mutedForeground };
+    case 'approved':
+      return { label: 'Approved', icon: 'check-circle', color: colors.success };
+    case 'rejected':
+      return { label: 'Rejected', icon: 'x-circle', color: colors.destructive };
+    case 'held':
+      return { label: 'On Hold', icon: 'pause-circle', color: colors.warning };
+    case 'partial_approved':
+      return { label: 'Partial', icon: 'pie-chart', color: '#3B82F6' };
+    case 'escalated':
+      return { label: 'Escalated', icon: 'alert-triangle', color: '#EF4444' };
+    case 'commented':
+      return { label: 'Comment', icon: 'message-square', color: colors.primary };
+    case 'transfer':
+      return { label: 'Transfer', icon: 'repeat', color: '#14B8A6' };
+    default:
+      return { label: action, icon: 'activity', color: colors.mutedForeground };
+  }
+}
+
+function ActivityRow({
+  entry,
+  colors,
+  onPress,
+}: {
+  entry: AuditEntry;
+  colors: ReturnType<typeof useColors>;
+  onPress: (entry: AuditEntry) => void;
+}) {
+  const meta = getActionMeta(entry.action, colors);
+  const canNavigate = !!entry.billId;
+  const description = entry.details ?? meta.label;
+
+  return (
+    <Pressable
+      testID={`activity-row-${entry.id}`}
+      onPress={() => onPress(entry)}
+      style={({ pressed }) => [
+        styles.activityRow,
+        { borderBottomColor: colors.border },
+        pressed && canNavigate && { opacity: 0.7 },
+      ]}
+      accessibilityRole={canNavigate ? 'button' : undefined}
+    >
+      <View style={[styles.activityBadge, { backgroundColor: meta.color + '22' }]}>
+        <Feather name={meta.icon} size={14} color={meta.color} />
+      </View>
+      <View style={styles.activityContent}>
+        <Text style={[styles.activityDescription, { color: colors.foreground }]} numberOfLines={1}>
+          {description}
+        </Text>
+        <Text style={[styles.activityMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+          <Text style={{ color: meta.color, fontWeight: '600' }}>{meta.label}</Text>
+          {' · '}
+          {entry.userName}
+        </Text>
+      </View>
+      <View style={styles.activityRight}>
+        <Text style={[styles.activityTime, { color: colors.mutedForeground }]}>
+          {entry.createdAt ? formatRelative(String(entry.createdAt)) : '—'}
+        </Text>
+        {canNavigate && (
+          <Feather name="chevron-right" size={14} color={colors.border} />
+        )}
+      </View>
+    </Pressable>
+  );
+}
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -15,6 +120,11 @@ export default function DashboardScreen() {
   const { userId, setUserId, isMD } = useUser();
   const { user, logout } = useAuth();
   const [isUserSwitcherVisible, setIsUserSwitcherVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleActivityPress = useCallback((entry: AuditEntry) => {
+    if (entry.billId) router.push(`/bill/${entry.billId}` as any);
+  }, []);
 
   function handleSignOut() {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -26,12 +136,25 @@ export default function DashboardScreen() {
     ]);
   }
 
-  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(
-    { userId: userId === 'all' ? undefined : userId },
-    { query: { queryKey: getGetDashboardSummaryQueryKey({ userId: userId === 'all' ? undefined : userId }) } }
+  const effectiveUserId = userId === 'all' ? undefined : userId;
+
+  const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useGetDashboardSummary(
+    { userId: effectiveUserId },
+    { query: { queryKey: getGetDashboardSummaryQueryKey({ userId: effectiveUserId }) } }
+  );
+
+  const { data: activityData, isLoading: isActivityLoading, refetch: refetchActivity } = useGetRecentActivity(
+    { userId: effectiveUserId, limit: 10 },
+    { query: { queryKey: getGetRecentActivityQueryKey({ userId: effectiveUserId, limit: 10 }) } }
   );
 
   const { data: usersData } = useListUsers();
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await Promise.all([refetchSummary(), refetchActivity()]);
+    setIsRefreshing(false);
+  }, [refetchSummary, refetchActivity]);
 
   const summaryCards = [
     { label: 'Scheduled Today', count: summary?.scheduledTodayCount, amount: summary?.scheduledTodayAmount, route: '/scheduled-today' },
@@ -78,15 +201,25 @@ export default function DashboardScreen() {
     </View>
   );
 
+  const activities = activityData?.activities ?? [];
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {renderHeader()}
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={[
-          styles.scrollContent, 
+          styles.scrollContent,
           { paddingBottom: Platform.OS === 'web' ? 34 : insets.bottom + 84 }
         ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {isSummaryLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
@@ -106,13 +239,13 @@ export default function DashboardScreen() {
               >
                 <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
                 {card.amount !== undefined && (
-                  <AmountText 
-                    amount={card.amount} 
+                  <AmountText
+                    amount={card.amount}
                     variant="large"
                     style={[
-                      styles.cardAmount, 
+                      styles.cardAmount,
                       { color: card.success ? colors.success : card.alert ? colors.destructive : colors.foreground }
-                    ]} 
+                    ]}
                   />
                 )}
                 {card.count !== undefined && (
@@ -127,8 +260,26 @@ export default function DashboardScreen() {
 
         <View style={styles.recentSection}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Activity</Text>
-          {/* Recent Activity component would go here */}
-          <Text style={{ color: colors.mutedForeground, marginTop: 12 }}>Coming soon...</Text>
+
+          {isActivityLoading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
+          ) : activities.length === 0 ? (
+            <View style={[styles.emptyState, { borderColor: colors.border }]}>
+              <Feather name="activity" size={28} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No recent activity</Text>
+            </View>
+          ) : (
+            <View style={[styles.activityList, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              {activities.map((entry) => (
+                <ActivityRow
+                  key={entry.id}
+                  entry={entry}
+                  colors={colors}
+                  onPress={handleActivityPress}
+                />
+              ))}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -142,17 +293,17 @@ export default function DashboardScreen() {
               All Users
             </Text>
           </Pressable>
-          {usersData?.users.map((user) => (
+          {usersData?.users.map((u) => (
             <Pressable
-              key={user.id}
+              key={u.id}
               style={styles.dropdownItem}
               onPress={() => {
-                setUserId(user.id);
+                setUserId(u.id);
                 setIsUserSwitcherVisible(false);
               }}
             >
-              <Text style={[styles.dropdownText, { color: userId === user.id ? colors.primary : colors.foreground }]}>
-                {user.name}
+              <Text style={[styles.dropdownText, { color: userId === u.id ? colors.primary : colors.foreground }]}>
+                {u.name}
               </Text>
             </Pressable>
           ))}
@@ -248,6 +399,60 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
+    marginBottom: 12,
+  },
+  activityList: {
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  activityBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  activityContent: {
+    flex: 1,
+    gap: 2,
+  },
+  activityDescription: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  activityMeta: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  activityRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+    flexShrink: 0,
+  },
+  activityTime: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  emptyState: {
+    borderWidth: 1,
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    paddingVertical: 32,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 14,
   },
   dropdown: {
     position: 'absolute',
