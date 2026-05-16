@@ -11,8 +11,10 @@ import {
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import * as Notifications from 'expo-notifications';
 
 export default function AlertsScreen() {
   const colors = useColors();
@@ -22,6 +24,14 @@ export default function AlertsScreen() {
   const currentUserId = authUser?.id ?? '';
 
   const notificationsQueryKey = getListNotificationsQueryKey({ userId: currentUserId });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS !== 'web') {
+        Notifications.setBadgeCountAsync(0).catch(() => {});
+      }
+    }, [])
+  );
 
   const { data, isLoading, refetch } = useListNotifications(
     { userId: currentUserId },
