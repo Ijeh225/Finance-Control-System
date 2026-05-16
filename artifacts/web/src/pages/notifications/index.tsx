@@ -9,8 +9,92 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bell, BellOff, CheckCheck } from "lucide-react";
+import {
+  Bell, BellOff, CheckCheck,
+  CheckCircle2, XCircle, CircleDashed, PauseCircle,
+  MessageCircle, AlertTriangle, Clock, Copy, ArrowUpCircle, Paperclip, Wallet,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { LucideIcon } from "lucide-react";
+
+interface IconConfig {
+  Icon: LucideIcon;
+  bg: string;
+  color: string;
+  bgUnread: string;
+  colorUnread: string;
+}
+
+const NOTIF_ICON_MAP: Record<string, IconConfig> = {
+  bill_approved: {
+    Icon: CheckCircle2,
+    bg: "bg-emerald-100", color: "text-emerald-500",
+    bgUnread: "bg-emerald-100", colorUnread: "text-emerald-600",
+  },
+  bill_rejected: {
+    Icon: XCircle,
+    bg: "bg-rose-100", color: "text-rose-400",
+    bgUnread: "bg-rose-100", colorUnread: "text-rose-600",
+  },
+  bill_partial: {
+    Icon: CircleDashed,
+    bg: "bg-orange-100", color: "text-orange-400",
+    bgUnread: "bg-orange-100", colorUnread: "text-orange-600",
+  },
+  bill_held: {
+    Icon: PauseCircle,
+    bg: "bg-amber-100", color: "text-amber-400",
+    bgUnread: "bg-amber-100", colorUnread: "text-amber-600",
+  },
+  comment_added: {
+    Icon: MessageCircle,
+    bg: "bg-blue-100", color: "text-blue-400",
+    bgUnread: "bg-blue-100", colorUnread: "text-blue-600",
+  },
+  wallet_low: {
+    Icon: Wallet,
+    bg: "bg-yellow-100", color: "text-yellow-500",
+    bgUnread: "bg-yellow-100", colorUnread: "text-yellow-600",
+  },
+  overdue_warning: {
+    Icon: Clock,
+    bg: "bg-rose-100", color: "text-rose-400",
+    bgUnread: "bg-rose-100", colorUnread: "text-rose-600",
+  },
+  duplicate_detected: {
+    Icon: Copy,
+    bg: "bg-orange-100", color: "text-orange-400",
+    bgUnread: "bg-orange-100", colorUnread: "text-orange-600",
+  },
+  escalated: {
+    Icon: ArrowUpCircle,
+    bg: "bg-red-100", color: "text-red-400",
+    bgUnread: "bg-red-100", colorUnread: "text-red-600",
+  },
+  attachment_uploaded: {
+    Icon: Paperclip,
+    bg: "bg-slate-100", color: "text-slate-400",
+    bgUnread: "bg-slate-100", colorUnread: "text-slate-600",
+  },
+};
+
+const FALLBACK_ICON: IconConfig = {
+  Icon: Bell,
+  bg: "bg-muted", color: "text-muted-foreground",
+  bgUnread: "bg-primary/15", colorUnread: "text-primary",
+};
+
+function NotifIcon({ type, unread }: { type: string; unread: boolean }) {
+  const cfg = NOTIF_ICON_MAP[type] ?? FALLBACK_ICON;
+  const { Icon } = cfg;
+  const bg = unread ? cfg.bgUnread : cfg.bg;
+  const color = unread ? cfg.colorUnread : cfg.color;
+  return (
+    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${bg}`}>
+      <Icon className={`w-4 h-4 ${color}`} />
+    </div>
+  );
+}
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -96,9 +180,7 @@ export default function Notifications() {
                   className={`p-4 flex gap-4 transition-colors ${!notif.isRead ? "bg-primary/5" : "hover:bg-muted/30"}`}
                   data-testid={`notification-${notif.id}`}
                 >
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${!notif.isRead ? "bg-primary/15" : "bg-muted"}`}>
-                    <Bell className={`w-4 h-4 ${!notif.isRead ? "text-primary" : "text-muted-foreground"}`} />
-                  </div>
+                  <NotifIcon type={notif.type ?? ""} unread={!notif.isRead} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div>
