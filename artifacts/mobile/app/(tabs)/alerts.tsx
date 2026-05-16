@@ -42,9 +42,14 @@ export default function AlertsScreen() {
     switch (type) {
       case 'bill_approved': return { name: 'check-circle' as const, color: colors.success };
       case 'bill_rejected': return { name: 'x-circle' as const, color: colors.destructive };
+      case 'bill_partial': return { name: 'git-branch' as const, color: colors.warning };
+      case 'bill_held': return { name: 'pause-circle' as const, color: colors.warning };
       case 'comment_added': return { name: 'message-square' as const, color: colors.primary };
       case 'overdue_warning': return { name: 'alert-triangle' as const, color: colors.destructive };
       case 'wallet_low': return { name: 'alert-circle' as const, color: colors.warning };
+      case 'attachment_uploaded': return { name: 'paperclip' as const, color: colors.primary };
+      case 'escalated': return { name: 'arrow-up-circle' as const, color: colors.destructive };
+      case 'duplicate_detected': return { name: 'copy' as const, color: colors.warning };
       default: return { name: 'bell' as const, color: colors.primary };
     }
   };

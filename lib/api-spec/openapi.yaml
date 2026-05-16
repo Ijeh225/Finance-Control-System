@@ -1783,6 +1783,7 @@ components:
             - overdue_warning
             - duplicate_detected
             - escalated
+            - attachment_uploaded
         title:
           type: string
         body:

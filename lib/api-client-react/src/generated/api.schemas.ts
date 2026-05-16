@@ -321,6 +321,7 @@ export const NotificationType = {
   overdue_warning: 'overdue_warning',
   duplicate_detected: 'duplicate_detected',
   escalated: 'escalated',
+  attachment_uploaded: 'attachment_uploaded',
 } as const;
 
 export interface Notification {

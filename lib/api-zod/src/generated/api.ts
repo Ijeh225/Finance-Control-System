@@ -1188,7 +1188,7 @@ export const ListNotificationsResponse = zod.object({
   "notifications": zod.array(zod.object({
   "id": zod.string(),
   "userId": zod.string(),
-  "type": zod.enum(['bill_approved', 'bill_rejected', 'bill_partial', 'bill_held', 'comment_added', 'wallet_low', 'overdue_warning', 'duplicate_detected', 'escalated']),
+  "type": zod.enum(['bill_approved', 'bill_rejected', 'bill_partial', 'bill_held', 'comment_added', 'wallet_low', 'overdue_warning', 'duplicate_detected', 'escalated', 'attachment_uploaded']),
   "title": zod.string(),
   "body": zod.string(),
   "billId": zod.string().optional(),
@@ -1209,7 +1209,7 @@ export const MarkNotificationReadParams = zod.object({
 export const MarkNotificationReadResponse = zod.object({
   "id": zod.string(),
   "userId": zod.string(),
-  "type": zod.enum(['bill_approved', 'bill_rejected', 'bill_partial', 'bill_held', 'comment_added', 'wallet_low', 'overdue_warning', 'duplicate_detected', 'escalated']),
+  "type": zod.enum(['bill_approved', 'bill_rejected', 'bill_partial', 'bill_held', 'comment_added', 'wallet_low', 'overdue_warning', 'duplicate_detected', 'escalated', 'attachment_uploaded']),
   "title": zod.string(),
   "body": zod.string(),
   "billId": zod.string().optional(),
