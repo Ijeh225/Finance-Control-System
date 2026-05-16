@@ -135,8 +135,22 @@ export default function AuditScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const isMd = user?.role === 'md';
 
-  if (user?.role !== 'md') {
+  const params = { limit };
+  const { data, isLoading, isFetching, refetch } = useListAuditTrail(
+    params,
+    { query: { queryKey: getListAuditTrailQueryKey(params), enabled: isMd } }
+  );
+
+  const entries = data?.entries ?? [];
+  const hasMore = entries.length >= limit;
+
+  const handleLoadMore = useCallback(() => {
+    setLimit(prev => prev + PAGE_SIZE);
+  }, []);
+
+  if (!isMd) {
     return (
       <View
         style={[
@@ -156,19 +170,6 @@ export default function AuditScreen() {
       </View>
     );
   }
-
-  const params = { limit };
-  const { data, isLoading, isFetching, refetch } = useListAuditTrail(
-    params,
-    { query: { queryKey: getListAuditTrailQueryKey(params) } }
-  );
-
-  const entries = data?.entries ?? [];
-  const hasMore = entries.length >= limit;
-
-  const handleLoadMore = useCallback(() => {
-    setLimit(prev => prev + PAGE_SIZE);
-  }, []);
 
   const renderFooter = () => {
     if (isFetching && entries.length > 0) {
