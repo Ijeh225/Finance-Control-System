@@ -21,6 +21,10 @@ import {
   useConfirmBillAttachment,
   useWithdrawBill,
   useUpdateBill,
+  useListVendors,
+  getListVendorsQueryKey,
+  useListWallets,
+  getListWalletsQueryKey,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -96,6 +100,8 @@ export default function BillDetailScreen() {
     scheduledDate: '',
     dueDate: '',
     priority: 'medium' as Priority,
+    vendorId: '',
+    walletId: '',
   });
 
   const billId = id as string;
@@ -122,6 +128,15 @@ export default function BillDetailScreen() {
   const withdrawMutation = useWithdrawBill();
   const updateMutation = useUpdateBill();
 
+  const { data: vendorsData } = useListVendors(undefined, {
+    query: { queryKey: getListVendorsQueryKey(), enabled: isEditVisible },
+  });
+  const { data: walletsData } = useListWallets(undefined, {
+    query: { queryKey: getListWalletsQueryKey(), enabled: isEditVisible },
+  });
+  const vendors = vendorsData?.vendors ?? [];
+  const wallets = walletsData?.wallets ?? [];
+
   const isMd = authUser?.role === 'md';
   const canAttach = authUser?.role === 'md' || authUser?.role === 'payment_assistant';
   const attachments = attachmentsData?.attachments ?? [];
@@ -138,6 +153,8 @@ export default function BillDetailScreen() {
       scheduledDate: bill.scheduledDate ?? '',
       dueDate: bill.dueDate ?? '',
       priority: (bill.priority as Priority) ?? 'medium',
+      vendorId: bill.vendorId ?? '',
+      walletId: bill.walletId ?? '',
     });
     setIsEditVisible(true);
   };
@@ -182,6 +199,8 @@ export default function BillDetailScreen() {
           scheduledDate: editForm.scheduledDate || undefined,
           dueDate: editForm.dueDate || undefined,
           priority: editForm.priority,
+          vendorId: editForm.vendorId || undefined,
+          walletId: editForm.walletId || undefined,
         },
       });
       await Promise.all([
@@ -591,6 +610,86 @@ export default function BillDetailScreen() {
                   ))}
                 </View>
               </View>
+
+              {vendors.length > 0 && (
+                <View>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Vendor</Text>
+                  <View style={[styles.pickerList, { borderColor: colors.border }]}>
+                    {vendors.map((v, idx) => {
+                      const selected = editForm.vendorId === v.id;
+                      return (
+                        <Pressable
+                          key={v.id}
+                          style={[
+                            styles.pickerItem,
+                            { borderColor: colors.border },
+                            idx < vendors.length - 1 && styles.pickerItemBorder,
+                            selected && { backgroundColor: colors.primary + '22' },
+                          ]}
+                          onPress={() => setEditForm((f) => ({ ...f, vendorId: v.id }))}
+                        >
+                          <View style={styles.pickerItemInner}>
+                            <Text style={[
+                              styles.pickerItemName,
+                              { color: selected ? colors.primary : colors.foreground },
+                            ]}>
+                              {v.name}
+                            </Text>
+                            {v.bankName && (
+                              <Text style={[styles.pickerItemSub, { color: colors.mutedForeground }]}>
+                                {v.bankName}
+                              </Text>
+                            )}
+                          </View>
+                          {selected && (
+                            <Text style={[styles.pickerCheck, { color: colors.primary }]}>✓</Text>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {wallets.length > 0 && (
+                <View>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Wallet</Text>
+                  <View style={[styles.pickerList, { borderColor: colors.border }]}>
+                    {wallets.map((w, idx) => {
+                      const selected = editForm.walletId === w.id;
+                      return (
+                        <Pressable
+                          key={w.id}
+                          style={[
+                            styles.pickerItem,
+                            { borderColor: colors.border },
+                            idx < wallets.length - 1 && styles.pickerItemBorder,
+                            selected && { backgroundColor: colors.primary + '22' },
+                          ]}
+                          onPress={() => setEditForm((f) => ({ ...f, walletId: w.id }))}
+                        >
+                          <View style={styles.pickerItemInner}>
+                            <Text style={[
+                              styles.pickerItemName,
+                              { color: selected ? colors.primary : colors.foreground },
+                            ]}>
+                              {w.name}
+                            </Text>
+                            {w.bankName && (
+                              <Text style={[styles.pickerItemSub, { color: colors.mutedForeground }]}>
+                                {w.bankName}
+                              </Text>
+                            )}
+                          </View>
+                          {selected && (
+                            <Text style={[styles.pickerCheck, { color: colors.primary }]}>✓</Text>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
             </ScrollView>
             <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 24) }]}>
               <Pressable
@@ -921,6 +1020,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  pickerList: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  pickerItemBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pickerItemInner: {
+    flex: 1,
+    gap: 2,
+  },
+  pickerItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  pickerItemSub: {
+    fontSize: 12,
+  },
+  pickerCheck: {
     fontSize: 16,
     fontWeight: '800',
   },
