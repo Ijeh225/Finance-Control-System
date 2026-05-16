@@ -36,14 +36,11 @@ A private executive treasury control system for an MD and payment assistants to 
 - `artifacts/mobile/context/AuthContext.tsx` — `AuthContext` + `useAuth()` hook
 - `artifacts/mobile/app/(tabs)/alerts.tsx` — alerts/notifications screen
 
-## Seeded credentials
+## Credentials
 
 | Role | Email | Password |
 |------|-------|----------|
 | MD (Chief Executive) | `md@fincommand.ng` | `FinCommand2026!` |
-| Payment Assistant A | `mra@fincommand.ng` | `MrA@2026` |
-| Payment Assistant B | `mrb@fincommand.ng` | `MrB@2026` |
-| Payment Assistant C | `mrc@fincommand.ng` | `MrC@2026` |
 
 ## Architecture decisions
 
