@@ -144,7 +144,7 @@ export default function Dashboard() {
                   <BarChart3 className="w-4 h-4 text-rose-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold font-mono">{formatCurrency((summary as any).outstandingAmount ?? 0)}</div>
+                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.totalOutstandingLiabilities)}</div>
                   <p className="text-xs text-muted-foreground font-medium mt-1">Total unpaid vendor debt</p>
                 </CardContent>
               </Card>
