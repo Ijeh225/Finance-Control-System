@@ -1,0 +1,49 @@
+Now, in the Payment Assistant section, when you click on Vendors and select a particular vendor such as Lucy, the “Add Expense/Add Job” functionality is working properly because it allows us to add another expense under that same vendor account.
+
+However, the issue we are having now is with the synchronization between the Vendor module and the Bills & Payments/Bills & Approval module.
+
+For example:
+If Lucy already has an existing vendor account and we add another expense/job for Lucy from the Vendor page, the system is currently creating another separate bill entry inside Bills & Approval. That is not how it is supposed to work.
+
+Since all the expenses are occurring under the same vendor account in the Vendor module, the Bills & Payments/Bills & Approval section should also reflect it as one continuous vendor account/ledger instead of creating multiple separate bill records for the same vendor.
+
+The correct behavior should be:
+
+* Lucy remains one vendor account
+* Every new expense/job added should accumulate under Lucy’s existing balance
+* The vendor running balance should increase automatically
+* The Bills & Approval section should synchronize with the same vendor account
+* The system should behave like one connected vendor ledger/account
+
+For example:
+
+Lucy Existing Outstanding:
+₦100,000
+
+New Expense Added:
+₦50,000
+
+Updated Outstanding Balance:
+₦150,000
+
+But it should still remain under the same Lucy account instead of creating another separate bill entry.
+
+Secondly, inside the Bills & Payments/Bills & Approval page, once a bill is opened, there should be an option to:
+
+* Reschedule Payment
+* Move Payment to Tomorrow
+* Change Scheduled Date
+* Re-submit Outstanding Balance
+
+Right now, I cannot find that functionality yet.
+
+This feature is very important because many payments are not cleared completely in one day. So if only part of the bill is paid today, the remaining balance should be rescheduled for another date directly from the bill page.
+
+The Vendor module and Bills & Approval module need to synchronize properly so that:
+
+* Vendor balances remain accurate
+* New expenses append correctly
+* Outstanding balances remain active
+* Partial payments reduce balances correctly
+* Rescheduled balances appear in future scheduled payments
+* Duplicate bill creation is avoided

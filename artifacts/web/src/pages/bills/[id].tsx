@@ -550,22 +550,53 @@ export default function BillDetail() {
         </Card>
       )}
 
-      {/* Reschedule */}
+      {/* Schedule Actions — visible when bill is approved or partial */}
       {canReschedule && (
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-sky-300 text-sky-700 hover:bg-sky-50"
-            onClick={() => { setRescheduleDate(bill.scheduledDate ?? ""); setShowReschedule(true); }}
-            data-testid="button-reschedule-bill"
-          >
-            <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Reschedule Remaining
-          </Button>
-          {bill.scheduledDate && (
-            <span className="text-xs text-muted-foreground">Currently scheduled: <span className="font-semibold font-mono">{bill.scheduledDate}</span></span>
-          )}
-        </div>
+        <Card className="shadow-sm border-sky-500/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold text-sky-700 flex items-center gap-2">
+              <CalendarClock className="w-4 h-4" /> Schedule Payment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm bg-sky-50/50 rounded p-3 border border-sky-200/50">
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Current Scheduled Date</p>
+                <p className="font-bold font-mono">{bill.scheduledDate ?? "Not set"}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Outstanding Balance</p>
+                <p className="font-bold font-mono text-amber-700">{formatCurrency(remainingApproved)}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-sky-300 text-sky-700 hover:bg-sky-50"
+                onClick={() => {
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  const dateStr = tomorrow.toISOString().split("T")[0]!;
+                  reschedule.mutate({ id: id!, data: { scheduledDate: dateStr } });
+                }}
+                disabled={reschedule.isPending}
+                data-testid="button-move-to-tomorrow"
+              >
+                <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Move to Tomorrow
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-sky-400 text-sky-800 hover:bg-sky-100"
+                onClick={() => { setRescheduleDate(bill.scheduledDate ?? ""); setShowReschedule(true); }}
+                data-testid="button-reschedule-bill"
+              >
+                <CalendarClock className="w-3.5 h-3.5 mr-1.5" /> Change Scheduled Date
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Attachments */}

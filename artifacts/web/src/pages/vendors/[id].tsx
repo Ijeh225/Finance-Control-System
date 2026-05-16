@@ -174,36 +174,63 @@ export default function VendorDetail() {
       {sortedBills.length > 0 && (
         <Card className="shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm uppercase tracking-wider font-semibold">Bills</CardTitle>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold">Expense Ledger</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Every expense added for this vendor accumulates here. Outstanding balance reflects what remains unpaid across all jobs.</p>
+              </div>
+              {canAddJob && (
+                <Link href={`/bills?create=1&vendorId=${id}`}>
+                  <Button size="sm" variant="outline" className="shrink-0 text-xs" data-testid="button-add-job-ledger">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Expense
+                  </Button>
+                </Link>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
-              {sortedBills.map((bill) => (
-                <Link key={bill.id} href={`/bills/${bill.id}`}>
-                  <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group" data-testid={`row-vendor-bill-${bill.id}`}>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold group-hover:text-primary transition-colors">{bill.description || "Bill"}</p>
-                      <div className="flex flex-wrap items-center gap-x-3 mt-0.5 text-xs text-muted-foreground font-mono">
-                        <span>Sched: {formatDate(bill.scheduledDate)}</span>
-                        <span>Due: {formatDate(bill.dueDate)}</span>
+              {sortedBills.map((bill) => {
+                const outstanding = Number(bill.outstandingBalance ?? 0);
+                const paid = Number(bill.paidAmount ?? 0);
+                return (
+                  <Link key={bill.id} href={`/bills/${bill.id}`}>
+                    <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group" data-testid={`row-vendor-bill-${bill.id}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold group-hover:text-primary transition-colors">{bill.description || "Expense"}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 mt-0.5 text-xs text-muted-foreground font-mono">
+                          <span>Sched: {formatDate(bill.scheduledDate)}</span>
+                          <span>Due: {formatDate(bill.dueDate)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</span>
+                          {paid > 0 && paid < Number(bill.amount ?? 0) && (
+                            <p className="text-xs text-teal-600 font-mono">Paid: {formatCurrency(paid)}</p>
+                          )}
+                          {outstanding > 0 && bill.status !== "paid" && (
+                            <p className="text-xs text-amber-600 font-semibold font-mono">Owing: {formatCurrency(outstanding)}</p>
+                          )}
+                          {bill.status === "paid" && (
+                            <p className="text-xs text-teal-600 font-mono">Cleared</p>
+                          )}
+                        </div>
+                        <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"]}`}>{bill.status?.replace("_", " ")}</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-right">
-                        <span className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</span>
-                        {bill.paidAmount != null && Number(bill.paidAmount) > 0 && Number(bill.paidAmount) !== Number(bill.amount) && (
-                          <p className="text-xs text-teal-600 font-mono">Paid: {formatCurrency(bill.paidAmount)}</p>
-                        )}
-                        {bill.outstandingBalance != null && Number(bill.outstandingBalance) > 0 && bill.status !== "paid" && (
-                          <p className="text-xs text-muted-foreground font-mono">Owing: {formatCurrency(bill.outstandingBalance)}</p>
-                        )}
-                      </div>
-                      <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"]}`}>{bill.status?.replace("_", " ")}</span>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="border-t bg-muted/30 px-4 py-3 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{sortedBills.length} expense{sortedBills.length !== 1 ? "s" : ""} · Running Total</span>
+              <div className="flex items-center gap-6 text-sm">
+                <span className="text-muted-foreground font-mono">Billed: <span className="font-bold text-foreground">{formatCurrency(vendor.totalBilled ?? 0)}</span></span>
+                <span className="text-teal-700 font-mono">Paid: <span className="font-bold">{formatCurrency(vendor.totalPaid ?? 0)}</span></span>
+                <span className="text-amber-700 font-mono font-semibold">Outstanding: <span className="font-bold">{formatCurrency(vendor.outstandingBalance ?? 0)}</span></span>
+              </div>
             </div>
           </CardContent>
         </Card>
