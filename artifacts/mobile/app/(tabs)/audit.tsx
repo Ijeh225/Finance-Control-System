@@ -17,6 +17,7 @@ import {
 } from '@workspace/api-client-react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
 const PAGE_SIZE = 30;
 
@@ -28,24 +29,22 @@ type ActionMeta = {
 
 function getActionMeta(action: string, colors: ReturnType<typeof useColors>): ActionMeta {
   switch (action) {
-    case 'approve':
-      return { label: 'Approved', icon: 'check-circle', color: colors.success };
-    case 'reject':
-      return { label: 'Rejected', icon: 'x-circle', color: colors.destructive };
-    case 'hold':
-      return { label: 'On Hold', icon: 'pause-circle', color: colors.warning };
-    case 'escalate':
-      return { label: 'Escalated', icon: 'alert-triangle', color: '#EF4444' };
-    case 'partial':
-      return { label: 'Partial', icon: 'pie-chart', color: '#3B82F6' };
-    case 'comment':
-      return { label: 'Comment', icon: 'message-square', color: colors.primary };
-    case 'submit':
-      return { label: 'Submitted', icon: 'send', color: '#8B5CF6' };
-    case 'create':
+    case 'created':
       return { label: 'Created', icon: 'plus-circle', color: '#6366F1' };
-    case 'update':
-      return { label: 'Updated', icon: 'edit-2', color: colors.mutedForeground };
+    case 'edited':
+      return { label: 'Edited', icon: 'edit-2', color: colors.mutedForeground };
+    case 'approved':
+      return { label: 'Approved', icon: 'check-circle', color: colors.success };
+    case 'rejected':
+      return { label: 'Rejected', icon: 'x-circle', color: colors.destructive };
+    case 'held':
+      return { label: 'On Hold', icon: 'pause-circle', color: colors.warning };
+    case 'partial_approved':
+      return { label: 'Partial', icon: 'pie-chart', color: '#3B82F6' };
+    case 'escalated':
+      return { label: 'Escalated', icon: 'alert-triangle', color: '#EF4444' };
+    case 'commented':
+      return { label: 'Comment', icon: 'message-square', color: colors.primary };
     default:
       return { label: action, icon: 'activity', color: colors.mutedForeground };
   }
@@ -64,6 +63,10 @@ function formatRelative(dateStr: string): string {
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
   return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function billRef(billId: string): string {
+  return `#${billId.slice(0, 8).toUpperCase()}`;
 }
 
 function AuditRow({ entry, colors }: { entry: AuditEntry; colors: ReturnType<typeof useColors> }) {
@@ -103,21 +106,25 @@ function AuditRow({ entry, colors }: { entry: AuditEntry; colors: ReturnType<typ
 
         <Text style={[styles.actor, { color: colors.foreground }]}>{entry.userName}</Text>
 
+        {hasBill && (
+          <Pressable
+            onPress={handlePress}
+            style={styles.billRef}
+            accessibilityLabel={`Open bill ${billRef(entry.billId!)}`}
+          >
+            <Feather name="file-text" size={12} color={colors.primary} />
+            <Text style={[styles.billRefText, { color: colors.primary }]}>
+              Bill {billRef(entry.billId!)}
+            </Text>
+            <Feather name="chevron-right" size={12} color={colors.primary} />
+          </Pressable>
+        )}
+
         {entry.details ? (
           <Text style={[styles.details, { color: colors.secondaryForeground }]} numberOfLines={2}>
             {entry.details}
           </Text>
         ) : null}
-
-        {hasBill && (
-          <View style={styles.billRef}>
-            <Feather name="file-text" size={11} color={colors.mutedForeground} />
-            <Text style={[styles.billRefText, { color: colors.mutedForeground }]}>
-              View bill
-            </Text>
-            <Feather name="chevron-right" size={11} color={colors.mutedForeground} />
-          </View>
-        )}
       </View>
     </Pressable>
   );
@@ -126,7 +133,29 @@ function AuditRow({ entry, colors }: { entry: AuditEntry; colors: ReturnType<typ
 export default function AuditScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [limit, setLimit] = useState(PAGE_SIZE);
+
+  if (user?.role !== 'md') {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.centered,
+          {
+            backgroundColor: colors.background,
+            paddingTop: Platform.OS === 'web' ? 67 : insets.top,
+          },
+        ]}
+      >
+        <Feather name="lock" size={48} color={colors.muted} />
+        <Text style={[styles.forbiddenTitle, { color: colors.foreground }]}>Access Restricted</Text>
+        <Text style={[styles.forbiddenBody, { color: colors.mutedForeground }]}>
+          The audit log is available to the MD only.
+        </Text>
+      </View>
+    );
+  }
 
   const params = { limit };
   const { data, isLoading, isFetching, refetch } = useListAuditTrail(
@@ -217,6 +246,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 40,
+  },
+  forbiddenTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  forbiddenBody: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -289,19 +334,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  details: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
   billRef: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
   },
   billRefText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  details: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   loadMoreBtn: {
     margin: 16,
