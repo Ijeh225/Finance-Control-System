@@ -92,11 +92,6 @@ export default function Login() {
               </Button>
             </form>
             
-            <div className="mt-6 pt-6 border-t border-border flex flex-col gap-1.5 text-xs text-muted-foreground font-mono">
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1">Demo Credentials</p>
-              <p>MD: md@fincommand.ng / FinCommand2026!</p>
-              <p>Asst A: mra@fincommand.ng / MrA@2026</p>
-            </div>
           </CardContent>
         </Card>
       </div>
