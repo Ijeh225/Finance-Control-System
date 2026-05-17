@@ -211,10 +211,10 @@ export default function WalletDetail() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button
-            variant="outline"
             onClick={() => { setTopUpAmount(""); setTopUpNarration(""); setShowTopUp(true); }}
+            data-testid="button-topup"
           >
-            <TrendingUp className="w-4 h-4 mr-2" /> Top Up
+            <TrendingUp className="w-4 h-4 mr-2" /> Fund Wallet
           </Button>
           <Button onClick={() => { setTransferForm(f => ({ ...f, fromWalletId: id ?? "" })); setShowTransfer(true); }}>
             <ArrowRightLeft className="w-4 h-4 mr-2" /> Transfer Funds
@@ -510,7 +510,7 @@ export default function WalletDetail() {
       <Dialog open={showTopUp} onOpenChange={setShowTopUp}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Top Up — {wallet?.name}</DialogTitle>
+            <DialogTitle>Fund Wallet — {wallet?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="space-y-1.5">
@@ -525,13 +525,14 @@ export default function WalletDetail() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration</Label>
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Source of Funds / Description</Label>
               <Input
-                placeholder="e.g. Monthly fund injection"
+                placeholder="e.g. Client payment received, office cash injection…"
                 value={topUpNarration}
                 onChange={e => setTopUpNarration(e.target.value)}
                 data-testid="input-topup-narration"
               />
+              <p className="text-xs text-muted-foreground">Describe where this money is coming from — it will appear on the transaction ledger.</p>
             </div>
             {wallet && topUpAmount && Number(topUpAmount) > 0 && (
               <div className="rounded-md bg-muted/40 border px-3 py-2 text-sm space-y-1">

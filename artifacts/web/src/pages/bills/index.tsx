@@ -285,12 +285,13 @@ export default function BillsList() {
       </Card>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Submit Bill for Approval</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-1.5">
+
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Vendor *</Label>
               <Select value={form.vendorId} onValueChange={(v) => setForm(f => ({ ...f, vendorId: v }))}>
                 <SelectTrigger data-testid="select-bill-vendor">
@@ -303,35 +304,43 @@ export default function BillsList() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2 space-y-1.5">
+
+            <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Description *</Label>
               <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Invoice #1234 — Q1 supplies" data-testid="input-bill-description" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
-              <Input type="number" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="font-mono" data-testid="input-bill-amount" />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
+                <Input type="number" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="font-mono" data-testid="input-bill-amount" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Priority *</Label>
+                <Select value={form.priority} onValueChange={(v: any) => setForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger data-testid="select-bill-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Priority *</Label>
-              <Select value={form.priority} onValueChange={(v: any) => setForm(f => ({ ...f, priority: v }))}>
-                <SelectTrigger data-testid="select-bill-priority">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Scheduled Date *</Label>
+                <Input type="date" value={form.scheduledDate} onChange={(e) => setForm(f => ({ ...f, scheduledDate: e.target.value }))} data-testid="input-bill-scheduled-date" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Due Date</Label>
+                <Input type="date" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} data-testid="input-bill-due-date" />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Scheduled Date *</Label>
-              <Input type="date" value={form.scheduledDate} onChange={(e) => setForm(f => ({ ...f, scheduledDate: e.target.value }))} data-testid="input-bill-scheduled-date" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Due Date</Label>
-              <Input type="date" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} data-testid="input-bill-due-date" />
-            </div>
+
             {walletsData?.wallets?.length ? (
-              <div className="col-span-2 space-y-1.5">
+              <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Pay From Wallet</Label>
                 <Select value={form.walletId} onValueChange={(v) => setForm(f => ({ ...f, walletId: v }))}>
                   <SelectTrigger data-testid="select-bill-wallet">
@@ -346,78 +355,79 @@ export default function BillsList() {
                 </Select>
               </div>
             ) : null}
-          </div>
-          {/* Notes + Link */}
-          <div className="col-span-2 space-y-1.5">
-            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Notes / Job Description (optional)</Label>
-            <Textarea
-              value={form.notes}
-              onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
-              placeholder="What is this bill for? Include job reference, container details, or any remarks…"
-              rows={3}
-              data-testid="textarea-bill-notes"
-            />
-          </div>
-          <div className="col-span-2 space-y-1.5">
-            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Invoice / Document Link (optional)</Label>
-            <Input
-              type="url"
-              value={form.link}
-              onChange={(e) => setForm(f => ({ ...f, link: e.target.value }))}
-              placeholder="https://drive.google.com/… or invoice URL"
-              data-testid="input-bill-link"
-            />
-          </div>
-          {/* Optional attachment */}
-          <div className="col-span-2 space-y-1.5">
-            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Attach Document (optional)</Label>
-            <input
-              ref={attachFileRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.csv"
-              data-testid="input-create-bill-attachment"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                if (!file) { setPendingFile(null); return; }
-                if (file.type && !ALLOWED_ATTACH_TYPES.has(file.type)) {
-                  toast({ title: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV.", variant: "destructive" });
-                  if (attachFileRef.current) attachFileRef.current.value = "";
-                  return;
-                }
-                if (file.size > 20 * 1024 * 1024) {
-                  toast({ title: "File exceeds the 20 MB limit.", variant: "destructive" });
-                  if (attachFileRef.current) attachFileRef.current.value = "";
-                  return;
-                }
-                setPendingFile(file);
-              }}
-            />
-            {pendingFile ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded border text-sm">
-                <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
-                <button
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Notes / Job Description (optional)</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="What is this bill for? Include job reference, container details, or any remarks…"
+                rows={3}
+                data-testid="textarea-bill-notes"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Invoice / Document Link (optional)</Label>
+              <Input
+                type="url"
+                value={form.link}
+                onChange={(e) => setForm(f => ({ ...f, link: e.target.value }))}
+                placeholder="https://drive.google.com/… or invoice URL"
+                data-testid="input-bill-link"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Attach Document (optional)</Label>
+              <input
+                ref={attachFileRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx,.csv"
+                data-testid="input-create-bill-attachment"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) { setPendingFile(null); return; }
+                  if (file.type && !ALLOWED_ATTACH_TYPES.has(file.type)) {
+                    toast({ title: "File type not allowed. Permitted: PDF, images, Word, Excel, CSV.", variant: "destructive" });
+                    if (attachFileRef.current) attachFileRef.current.value = "";
+                    return;
+                  }
+                  if (file.size > 20 * 1024 * 1024) {
+                    toast({ title: "File exceeds the 20 MB limit.", variant: "destructive" });
+                    if (attachFileRef.current) attachFileRef.current.value = "";
+                    return;
+                  }
+                  setPendingFile(file);
+                }}
+              />
+              {pendingFile ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded border text-sm">
+                  <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setPendingFile(null); if (attachFileRef.current) attachFileRef.current.value = ""; }}
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    data-testid="button-remove-attachment"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <Button
                   type="button"
-                  onClick={() => { setPendingFile(null); if (attachFileRef.current) attachFileRef.current.value = ""; }}
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  data-testid="button-remove-attachment"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-muted-foreground"
+                  onClick={() => attachFileRef.current?.click()}
+                  data-testid="button-pick-attachment"
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full text-muted-foreground"
-                onClick={() => attachFileRef.current?.click()}
-                data-testid="button-pick-attachment"
-              >
-                <Paperclip className="w-3.5 h-3.5 mr-1.5" /> Choose file…
-              </Button>
-            )}
+                  <Paperclip className="w-3.5 h-3.5 mr-1.5" /> Choose file…
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
