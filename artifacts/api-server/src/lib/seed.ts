@@ -60,35 +60,7 @@ export async function seedIfEmpty() {
       }
     }
 
-    // ── 2. Payment-assistant demo account ────────────────────────────────────
-    const [pa] = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.email, "mra@fincommand.ng"))
-      .limit(1);
-
-    let paId: string;
-    let paName: string;
-    if (!pa) {
-      paId = uid();
-      paName = "Asst A";
-      const passwordHash = await bcrypt.hash("MrA@2026", 10);
-      await db.insert(usersTable).values({
-        id: paId,
-        name: paName,
-        role: "payment_assistant",
-        email: "mra@fincommand.ng",
-        phone: "+234 800 000 0002",
-        passwordHash,
-        isActive: true,
-      });
-      logger.info("Payment assistant account created.");
-    } else {
-      paId = pa.id;
-      paName = pa.name;
-    }
-
-    // ── 3. Bail out early if vendors already exist (idempotency guard) ────────
+    // ── 2. Bail out early if vendors already exist (idempotency guard) ──────────
     const [{ vendorCount }] = await db
       .select({ vendorCount: sql<number>`count(*)::int` })
       .from(vendorsTable);
@@ -153,10 +125,10 @@ export async function seedIfEmpty() {
       walletName: "GTBank Operations",
       priority,
       status: "paid" as const,
-      createdBy: paId,
-      createdByName: paName,
-      paidBy: paId,
-      paidByName: paName,
+      createdBy: mdId,
+      createdByName: "MD — Chief Executive",
+      paidBy: mdId,
+      paidByName: "MD — Chief Executive",
       paidAt: daysAgo(daysAgoPaid),
       paymentReference: `REF-${id.toUpperCase().slice(-6)}`,
       paidWalletId: wGTB,
@@ -214,10 +186,10 @@ export async function seedIfEmpty() {
         walletName: "GTBank Operations",
         priority: "urgent" as const,
         status: "partial" as const,
-        createdBy: paId,
-        createdByName: paName,
-        paidBy: paId,
-        paidByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
+        paidBy: mdId,
+        paidByName: "MD — Chief Executive",
         paidAt: daysAgo(4),
         paymentReference: `REF-${b10.toUpperCase().slice(-6)}`,
         paidWalletId: wGTB,
@@ -238,10 +210,10 @@ export async function seedIfEmpty() {
         walletName: "GTBank Operations",
         priority: "high" as const,
         status: "partial" as const,
-        createdBy: paId,
-        createdByName: paName,
-        paidBy: paId,
-        paidByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
+        paidBy: mdId,
+        paidByName: "MD — Chief Executive",
         paidAt: daysAgo(2),
         paymentReference: `REF-${b11.toUpperCase().slice(-6)}`,
         paidWalletId: wGTB,
@@ -259,8 +231,8 @@ export async function seedIfEmpty() {
         scheduledDate: dateStr(-3),
         priority: "medium" as const,
         status: "pending" as const,
-        createdBy: paId,
-        createdByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
       },
       {
         id: b13,
@@ -273,8 +245,8 @@ export async function seedIfEmpty() {
         scheduledDate: dateStr(-5),
         priority: "low" as const,
         status: "pending" as const,
-        createdBy: paId,
-        createdByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
       },
       {
         id: b14,
@@ -287,8 +259,8 @@ export async function seedIfEmpty() {
         scheduledDate: dateStr(-7),
         priority: "medium" as const,
         status: "pending" as const,
-        createdBy: paId,
-        createdByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
       },
       // ── Approved (ready to pay) ───────────────────────────────────────────
       {
@@ -305,8 +277,8 @@ export async function seedIfEmpty() {
         walletName: "Zenith Treasury",
         priority: "medium" as const,
         status: "approved" as const,
-        createdBy: paId,
-        createdByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
       },
       // ── Overdue ──────────────────────────────────────────────────────────
       {
@@ -320,8 +292,8 @@ export async function seedIfEmpty() {
         scheduledDate: dateStr(6),
         priority: "urgent" as const,
         status: "overdue" as const,
-        createdBy: paId,
-        createdByName: paName,
+        createdBy: mdId,
+        createdByName: "MD — Chief Executive",
         overdueDays: 6,
       },
     ]);
@@ -404,8 +376,8 @@ export async function seedIfEmpty() {
     const payRows = [b1, b2, b3, b4, b5, b6, b7, b8, b9].map(billId => ({
       id: uid(),
       billId,
-      userId: paId,
-      userName: paName,
+      userId: mdId,
+      userName: "MD — Chief Executive",
       action: "pay",
       details: "Payment processed",
     }));
