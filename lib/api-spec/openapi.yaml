@@ -1780,6 +1780,12 @@ components:
           type: string
         paidWalletName:
           type: string
+        notes:
+          type: string
+          nullable: true
+        link:
+          type: string
+          nullable: true
       required:
         - id
         - vendorId
@@ -1834,6 +1840,10 @@ components:
           type: string
         hasAttachment:
           type: boolean
+        notes:
+          type: string
+        link:
+          type: string
       required: [vendorId, description, amount, scheduledDate, priority, createdBy]
 
     UpdateBillInput:
@@ -1854,6 +1864,10 @@ components:
         priority:
           type: string
           enum: [low, medium, high, urgent]
+        notes:
+          type: string
+        link:
+          type: string
 
     ProcessPaymentInput:
       type: object
@@ -1891,6 +1905,15 @@ components:
           type: number
         lastPaymentDate:
           type: string
+        containers:
+          type: string
+          nullable: true
+        requestPurpose:
+          type: string
+          nullable: true
+        relatedLink:
+          type: string
+          nullable: true
         createdAt:
           type: string
       required: [id, name, totalBilled, totalPaid, outstandingBalance, createdAt]
@@ -1922,6 +1945,12 @@ components:
         bankName:
           type: string
         accountNumber:
+          type: string
+        containers:
+          type: string
+        requestPurpose:
+          type: string
+        relatedLink:
           type: string
       required: [name]
 

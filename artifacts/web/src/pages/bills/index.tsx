@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FileText, ChevronRight, Paperclip, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 const ALLOWED_ATTACH_TYPES = new Set([
@@ -85,6 +86,7 @@ export default function BillsList() {
     walletId: "none",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
     notes: "",
+    link: "",
   });
 
   const queryParams = {
@@ -113,7 +115,7 @@ export default function BillsList() {
     setShowCreate(false);
     setIsSubmitting(false);
     setPendingFile(null);
-    setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "none", priority: "medium", notes: "" });
+    setForm({ vendorId: "", description: "", amount: "", scheduledDate: "", dueDate: "", walletId: "none", priority: "medium", notes: "", link: "" });
     if (attachFileRef.current) attachFileRef.current.value = "";
   };
 
@@ -130,6 +132,8 @@ export default function BillsList() {
           walletId: (form.walletId && form.walletId !== "none") ? form.walletId : undefined,
           priority: form.priority,
           createdBy: user!.id,
+          notes: form.notes || undefined,
+          link: form.link || undefined,
         },
       });
       qc.invalidateQueries({ queryKey: getListBillsQueryKey() });
@@ -341,6 +345,27 @@ export default function BillsList() {
                 </Select>
               </div>
             ) : null}
+          </div>
+          {/* Notes + Link */}
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Notes / Job Description (optional)</Label>
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="What is this bill for? Include job reference, container details, or any remarks…"
+              rows={3}
+              data-testid="textarea-bill-notes"
+            />
+          </div>
+          <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Invoice / Document Link (optional)</Label>
+            <Input
+              type="url"
+              value={form.link}
+              onChange={(e) => setForm(f => ({ ...f, link: e.target.value }))}
+              placeholder="https://drive.google.com/… or invoice URL"
+              data-testid="input-bill-link"
+            />
           </div>
           {/* Optional attachment */}
           <div className="col-span-2 space-y-1.5">

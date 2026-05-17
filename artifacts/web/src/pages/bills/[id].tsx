@@ -36,7 +36,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpCircle,
   ChevronLeft, MessageSquare, Activity, User, Send,
   Paperclip, Upload, Download, Trash2, FileText, Pencil,
-  Wallet, CreditCard, BadgeCheck, Hash, CalendarClock,
+  Wallet, CreditCard, BadgeCheck, Hash, CalendarClock, ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -100,6 +100,8 @@ export default function BillDetail() {
     dueDate: "",
     walletId: "",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
+    notes: "",
+    link: "",
   });
 
   const { data: bill, isLoading: billLoading } = useGetBill(id!, {
@@ -338,6 +340,8 @@ export default function BillDetail() {
       dueDate: bill.dueDate ?? "",
       walletId: bill.walletId ?? "",
       priority: (bill.priority as "low" | "medium" | "high" | "urgent") ?? "medium",
+      notes: (bill as any).notes ?? "",
+      link: (bill as any).link ?? "",
     });
     setShowEdit(true);
   };
@@ -354,6 +358,25 @@ export default function BillDetail() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-bill-vendor">{bill.vendorName}</h1>
           <p className="text-muted-foreground text-sm font-medium mt-1">{bill.description}</p>
+          {(bill as any).notes && (
+            <div className="mt-2 flex items-start gap-2 text-sm text-foreground/80 bg-muted/40 rounded-md px-3 py-2 border border-border/50 max-w-xl">
+              <FileText className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />
+              <span className="whitespace-pre-wrap">{(bill as any).notes}</span>
+            </div>
+          )}
+          {(bill as any).link && (
+            <div className="mt-1.5">
+              <a
+                href={(bill as any).link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                {(bill as any).link.length > 60 ? (bill as any).link.slice(0, 60) + "…" : (bill as any).link}
+              </a>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded border ${PRIORITY_COLORS[bill.priority ?? "low"]}`}>{bill.priority}</span>
@@ -1075,6 +1098,26 @@ export default function BillDetail() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Notes / Job Description</Label>
+              <Textarea
+                value={editForm.notes}
+                onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="What is this bill for? Include job reference, container details, or any remarks…"
+                rows={3}
+                data-testid="textarea-edit-notes"
+              />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Invoice / Document Link</Label>
+              <Input
+                type="url"
+                value={editForm.link}
+                onChange={(e) => setEditForm(f => ({ ...f, link: e.target.value }))}
+                placeholder="https://drive.google.com/… or invoice URL"
+                data-testid="input-edit-link"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowEdit(false)}>Cancel</Button>
@@ -1090,6 +1133,8 @@ export default function BillDetail() {
                   dueDate: editForm.dueDate,
                   walletId: editForm.walletId,
                   priority: editForm.priority,
+                  notes: editForm.notes || undefined,
+                  link: editForm.link || undefined,
                 },
               })}
               data-testid="button-confirm-edit"

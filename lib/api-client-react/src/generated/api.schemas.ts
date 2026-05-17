@@ -146,6 +146,8 @@ export interface Bill {
   paymentReference?: string;
   paidWalletId?: string;
   paidWalletName?: string;
+  notes?: string | null;
+  link?: string | null;
 }
 
 export type UserProfile = User & {
@@ -188,6 +190,9 @@ export interface Vendor {
   totalPaid: number;
   outstandingBalance: number;
   lastPaymentDate?: string;
+  containers?: string | null;
+  requestPurpose?: string | null;
+  relatedLink?: string | null;
   createdAt: string;
 }
 
@@ -217,6 +222,8 @@ export interface CreateBillInput {
   priority: CreateBillInputPriority;
   createdBy: string;
   hasAttachment?: boolean;
+  notes?: string;
+  link?: string;
 }
 
 export type UpdateBillInputPriority = typeof UpdateBillInputPriority[keyof typeof UpdateBillInputPriority];
@@ -237,6 +244,8 @@ export interface UpdateBillInput {
   dueDate?: string;
   walletId?: string;
   priority?: UpdateBillInputPriority;
+  notes?: string;
+  link?: string;
 }
 
 export interface ProcessPaymentInput {
@@ -257,6 +266,9 @@ export interface CreateVendorInput {
   email?: string;
   bankName?: string;
   accountNumber?: string;
+  containers?: string;
+  requestPurpose?: string;
+  relatedLink?: string;
 }
 
 export interface LiabilityAging {

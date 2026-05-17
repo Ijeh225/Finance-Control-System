@@ -85,7 +85,7 @@ router.get("/bills", async (req, res): Promise<void> => {
 
 router.post("/bills", async (req, res): Promise<void> => {
   const actor = req.user!;
-  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority, hasAttachment } = req.body;
+  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority, hasAttachment, notes, link } = req.body;
   if (!vendorId || !description || !amount || !scheduledDate) {
     res.status(400).json({ error: "Missing required fields" }); return;
   }
@@ -99,6 +99,7 @@ router.post("/bills", async (req, res): Promise<void> => {
     scheduledDate, dueDate, walletId, priority: priority ?? "medium",
     status: "pending", createdBy: actor.id, createdByName: actor.name,
     hasAttachment: Boolean(hasAttachment), overdueDays: 0,
+    notes: notes || null, link: link || null,
   }).returning();
 
   await db.update(vendorsTable).set({
@@ -151,12 +152,12 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
   if (["approved", "paid"].includes(existing.status)) {
     res.status(400).json({ error: `Cannot edit a bill with status '${existing.status}'` }); return;
   }
-  // Non-MD users may only edit their own pending bills
-  if (actor.role !== "md" && existing.status !== "pending") {
-    res.status(403).json({ error: "You can only edit bills in pending status" }); return;
+  // Non-MD users may only edit their own pending, on-hold, or overdue bills
+  if (actor.role !== "md" && !["pending", "on_hold", "overdue"].includes(existing.status)) {
+    res.status(403).json({ error: "You can only edit bills in pending, on-hold, or overdue status" }); return;
   }
 
-  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority } = req.body;
+  const { vendorId, description, amount, scheduledDate, dueDate, walletId, priority, notes, link } = req.body;
   const updates: Record<string, unknown> = {};
   if (vendorId) {
     const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
@@ -165,6 +166,8 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
     updates["vendorName"] = vendor.name;
   }
   if (description) updates["description"] = description;
+  if (notes !== undefined) updates["notes"] = notes || null;
+  if (link !== undefined) updates["link"] = link || null;
   let amountDelta = 0;
   let outstandingDelta = 0;
   if (amount !== undefined) {

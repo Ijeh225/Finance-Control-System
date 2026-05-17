@@ -36,9 +36,12 @@ router.get("/vendors", async (req, res): Promise<void> => {
 });
 
 router.post("/vendors", async (req, res): Promise<void> => {
-  const { name, phone, email, bankName, accountNumber } = req.body;
+  const { name, phone, email, bankName, accountNumber, containers, requestPurpose, relatedLink } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
-  const [vendor] = await db.insert(vendorsTable).values({ id: uid(), name, phone, email, bankName, accountNumber }).returning();
+  const [vendor] = await db.insert(vendorsTable).values({
+    id: uid(), name, phone, email, bankName, accountNumber,
+    containers: containers || null, requestPurpose: requestPurpose || null, relatedLink: relatedLink || null,
+  }).returning();
   res.status(201).json(formatVendor(vendor as Record<string, unknown>));
 });
 

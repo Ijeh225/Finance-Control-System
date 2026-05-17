@@ -13,6 +13,9 @@ export const vendorsTable = pgTable("vendors", {
   totalPaid: numeric("total_paid", { precision: 15, scale: 2 }).notNull().default("0"),
   outstandingBalance: numeric("outstanding_balance", { precision: 15, scale: 2 }).notNull().default("0"),
   lastPaymentDate: timestamp("last_payment_date", { withTimezone: true }),
+  containers: text("containers"),
+  requestPurpose: text("request_purpose"),
+  relatedLink: text("related_link"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

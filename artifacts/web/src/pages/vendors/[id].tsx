@@ -15,7 +15,8 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus, Trash2, ExternalLink, Package, FileText, Link2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -61,6 +62,7 @@ export default function VendorDetail() {
   const [addMode, setAddMode] = useState<"existing" | "new">("existing");
   const [addAmount, setAddAmount] = useState("");
   const [addNote, setAddNote] = useState("");
+  const [addLink, setAddLink] = useState("");
 
   const { data: vendor, isLoading: vendorLoading } = useGetVendor(id!, {
     query: { enabled: !!id, queryKey: getGetVendorQueryKey(id!) },
@@ -77,9 +79,13 @@ export default function VendorDetail() {
         setShowAddExpense(false);
         setAddAmount("");
         setAddNote("");
+        setAddLink("");
         toast({ title: "Expense added to existing bill" });
       },
-      onError: () => toast({ title: "Failed to update bill", variant: "destructive" }),
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Failed to update bill", variant: "destructive" });
+      },
     },
   });
 
@@ -112,32 +118,35 @@ export default function VendorDetail() {
     return 0;
   }) : [];
 
-  // Pending bills are the candidates to add an expense to
-  const pendingBills = sortedBills.filter(b => b.status === "pending");
-  const targetPendingBill = pendingBills[0];
+  // Any active bill is a candidate to add an expense to (prefer pending, then on_hold/overdue)
+  const targetActiveBill = sortedBills.find(b => b.status === "pending")
+    ?? sortedBills.find(b => b.status === "on_hold" || b.status === "overdue")
+    ?? sortedBills.find(b => ACTIVE_STATUSES.has(b.status ?? ""));
 
   const openAddExpense = () => {
-    setAddMode(targetPendingBill ? "existing" : "new");
+    setAddMode(targetActiveBill ? "existing" : "new");
     setAddAmount("");
     setAddNote("");
+    setAddLink("");
     setShowAddExpense(true);
   };
 
   const handleAddExpenseConfirm = () => {
-    if (addMode === "new" || !targetPendingBill) {
+    if (addMode === "new" || !targetActiveBill) {
       setShowAddExpense(false);
       setLocation(`/bills?create=1&vendorId=${id}`);
       return;
     }
     const extra = Number(addAmount);
     if (!extra || extra <= 0) return;
-    const newTotal = Number(targetPendingBill.amount ?? 0) + extra;
-    const newDescription = addNote
-      ? `${targetPendingBill.description ?? "Expense"}; ${addNote}`
-      : undefined;
+    const newTotal = Number(targetActiveBill.amount ?? 0) + extra;
     updateBill.mutate({
-      id: targetPendingBill.id!,
-      data: { amount: newTotal, ...(newDescription ? { description: newDescription } : {}) },
+      id: targetActiveBill.id!,
+      data: {
+        amount: newTotal,
+        ...(addNote ? { notes: addNote } : {}),
+        ...(addLink ? { link: addLink } : {}),
+      },
     });
   };
 
@@ -163,6 +172,27 @@ export default function VendorDetail() {
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Phone className="w-3.5 h-3.5" /> {vendor.phone}
               </span>
+            )}
+            {(vendor as any).containers && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Package className="w-3.5 h-3.5" /> {(vendor as any).containers}
+              </span>
+            )}
+            {(vendor as any).requestPurpose && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <FileText className="w-3.5 h-3.5" /> {(vendor as any).requestPurpose}
+              </span>
+            )}
+            {(vendor as any).relatedLink && (
+              <a
+                href={(vendor as any).relatedLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Related Doc
+              </a>
             )}
           </div>
         </div>
@@ -284,9 +314,20 @@ export default function VendorDetail() {
                     <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group" data-testid={`row-vendor-bill-${bill.id}`}>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold group-hover:text-primary transition-colors">{bill.description || "Expense"}</p>
+                        {(bill as any).notes && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 flex items-start gap-1">
+                            <FileText className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground/60" />
+                            {(bill as any).notes}
+                          </p>
+                        )}
                         <div className="flex flex-wrap items-center gap-x-3 mt-0.5 text-xs text-muted-foreground font-mono">
                           <span>Sched: {formatDate(bill.scheduledDate)}</span>
                           <span>Due: {formatDate(bill.dueDate)}</span>
+                          {(bill as any).link && (
+                            <span className="flex items-center gap-0.5 text-primary/70">
+                              <Link2 className="w-3 h-3" /> Link
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
@@ -329,8 +370,8 @@ export default function VendorDetail() {
             <DialogTitle>Add Expense — {vendor.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-1">
-            {/* Mode selection — only shown when a pending bill exists */}
-            {targetPendingBill && (
+            {/* Mode selection — shown whenever an active bill exists */}
+            {targetActiveBill && (
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Where should this expense go?</Label>
                 <div className="grid grid-cols-2 gap-2">
@@ -340,7 +381,7 @@ export default function VendorDetail() {
                     className={`rounded-lg border p-3 text-left transition-colors ${addMode === "existing" ? "border-primary bg-primary/5 text-primary" : "border-border hover:bg-muted/40"}`}
                   >
                     <p className="text-sm font-semibold">Add to existing bill</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 font-mono">{formatCurrency(targetPendingBill.amount ?? 0)} pending</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 font-mono capitalize">{formatCurrency(targetActiveBill.amount ?? 0)} · {(targetActiveBill.status ?? "").replace("_", " ")}</p>
                   </button>
                   <button
                     type="button"
@@ -355,19 +396,19 @@ export default function VendorDetail() {
             )}
 
             {/* Existing bill summary */}
-            {addMode === "existing" && targetPendingBill && (
+            {addMode === "existing" && targetActiveBill && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm space-y-1">
-                <p className="font-semibold text-amber-900">{targetPendingBill.description || "Existing bill"}</p>
-                <p className="text-xs text-amber-700 font-mono">Current amount: {formatCurrency(targetPendingBill.amount ?? 0)}</p>
+                <p className="font-semibold text-amber-900">{targetActiveBill.description || "Existing bill"}</p>
+                <p className="text-xs text-amber-700 font-mono">Current amount: {formatCurrency(targetActiveBill.amount ?? 0)}</p>
                 {addAmount && Number(addAmount) > 0 && (
                   <p className="text-xs font-semibold text-amber-800 font-mono border-t border-amber-200 pt-1 mt-1">
-                    New total: {formatCurrency(Number(targetPendingBill.amount ?? 0) + Number(addAmount))}
+                    New total: {formatCurrency(Number(targetActiveBill.amount ?? 0) + Number(addAmount))}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Amount — shown for "add to existing" mode */}
+            {/* Amount + Notes + Link — shown for "add to existing" mode */}
             {addMode === "existing" && (
               <>
                 <div className="space-y-1.5">
@@ -382,11 +423,21 @@ export default function VendorDetail() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Note (optional)</Label>
-                  <Input
-                    placeholder="What is this additional charge for?"
+                  <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Notes / Job Description (optional)</Label>
+                  <Textarea
+                    placeholder="What is this charge for? Job reference, container details, remarks…"
                     value={addNote}
                     onChange={e => setAddNote(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Invoice / Document Link (optional)</Label>
+                  <Input
+                    type="url"
+                    placeholder="https://drive.google.com/… or invoice URL"
+                    value={addLink}
+                    onChange={e => setAddLink(e.target.value)}
                   />
                 </div>
               </>

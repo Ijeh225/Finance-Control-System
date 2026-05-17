@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Building2, Search, Plus, ChevronRight } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Vendors() {
@@ -22,7 +23,7 @@ export default function Vendors() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", bankName: "", accountNumber: "", phone: "", email: "" });
+  const [form, setForm] = useState({ name: "", bankName: "", accountNumber: "", phone: "", email: "", containers: "", requestPurpose: "", relatedLink: "" });
 
   const { data, isLoading } = useListVendors(search ? { search } : undefined, {
     query: { queryKey: getListVendorsQueryKey(search ? { search } : undefined) },
@@ -33,7 +34,7 @@ export default function Vendors() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListVendorsQueryKey() });
         setShowCreate(false);
-        setForm({ name: "", bankName: "", accountNumber: "", phone: "", email: "" });
+        setForm({ name: "", bankName: "", accountNumber: "", phone: "", email: "", containers: "", requestPurpose: "", relatedLink: "" });
         toast({ title: "Vendor created" });
       },
       onError: () => toast({ title: "Failed to create vendor", variant: "destructive" }),
@@ -143,12 +144,24 @@ export default function Vendors() {
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Email</Label>
               <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="vendor@example.com" />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">No. of Containers / Size</Label>
+              <Input value={form.containers} onChange={(e) => setForm(f => ({ ...f, containers: e.target.value }))} placeholder="e.g. 2×20ft, 1×40ft" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Related Link / Document</Label>
+              <Input type="url" value={form.relatedLink} onChange={(e) => setForm(f => ({ ...f, relatedLink: e.target.value }))} placeholder="https://drive.google.com/…" />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Request Purpose</Label>
+              <Textarea value={form.requestPurpose} onChange={(e) => setForm(f => ({ ...f, requestPurpose: e.target.value }))} placeholder="Describe the purpose of this vendor relationship or job…" rows={2} />
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
             <Button
               disabled={!form.name || createVendor.isPending}
-              onClick={() => createVendor.mutate({ data: { name: form.name, bankName: form.bankName || undefined, accountNumber: form.accountNumber || undefined, phone: form.phone || undefined, email: form.email || undefined } })}
+              onClick={() => createVendor.mutate({ data: { name: form.name, bankName: form.bankName || undefined, accountNumber: form.accountNumber || undefined, phone: form.phone || undefined, email: form.email || undefined, containers: form.containers || undefined, requestPurpose: form.requestPurpose || undefined, relatedLink: form.relatedLink || undefined } })}
               data-testid="button-confirm-create-vendor"
             >
               {createVendor.isPending ? "Creating..." : "Create Vendor"}

@@ -81,7 +81,9 @@ export const GetScheduledTodayResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })
@@ -121,7 +123,9 @@ export const GetScheduledTomorrowResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })
@@ -161,7 +165,9 @@ export const GetOverdueBillsResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })
@@ -248,7 +254,9 @@ export const GetPaymentHistoryResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })
@@ -453,7 +461,9 @@ export const GetUserProfileResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 }))
 }))
 
@@ -497,7 +507,9 @@ export const ListBillsResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })
@@ -515,7 +527,9 @@ export const CreateBillBody = zod.object({
   "walletId": zod.string().optional(),
   "priority": zod.enum(['low', 'medium', 'high', 'urgent']),
   "createdBy": zod.string(),
-  "hasAttachment": zod.boolean().optional()
+  "hasAttachment": zod.boolean().optional(),
+  "notes": zod.string().optional(),
+  "link": zod.string().optional()
 })
 
 
@@ -552,7 +566,9 @@ export const GetBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 }).and(zod.object({
   "comments": zod.array(zod.object({
   "id": zod.string(),
@@ -586,6 +602,9 @@ export const GetBillResponse = zod.object({
   "totalPaid": zod.number(),
   "outstandingBalance": zod.number(),
   "lastPaymentDate": zod.string().optional(),
+  "containers": zod.string().nullish(),
+  "requestPurpose": zod.string().nullish(),
+  "relatedLink": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional()
 }))
@@ -605,7 +624,9 @@ export const UpdateBillBody = zod.object({
   "scheduledDate": zod.string().optional(),
   "dueDate": zod.string().optional(),
   "walletId": zod.string().optional(),
-  "priority": zod.enum(['low', 'medium', 'high', 'urgent']).optional()
+  "priority": zod.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  "notes": zod.string().optional(),
+  "link": zod.string().optional()
 })
 
 export const UpdateBillResponse = zod.object({
@@ -634,7 +655,9 @@ export const UpdateBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -688,7 +711,9 @@ export const ApproveBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -729,7 +754,9 @@ export const RejectBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -771,7 +798,9 @@ export const HoldBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -813,7 +842,9 @@ export const PartialApproveBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -854,7 +885,9 @@ export const EscalateBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -910,7 +943,9 @@ export const ProcessBillPaymentResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -951,7 +986,9 @@ export const RescheduleBillResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })
 
 
@@ -1116,6 +1153,9 @@ export const ListVendorsResponse = zod.object({
   "totalPaid": zod.number(),
   "outstandingBalance": zod.number(),
   "lastPaymentDate": zod.string().optional(),
+  "containers": zod.string().nullish(),
+  "requestPurpose": zod.string().nullish(),
+  "relatedLink": zod.string().nullish(),
   "createdAt": zod.string()
 }))
 })
@@ -1129,7 +1169,10 @@ export const CreateVendorBody = zod.object({
   "phone": zod.string().optional(),
   "email": zod.string().optional(),
   "bankName": zod.string().optional(),
-  "accountNumber": zod.string().optional()
+  "accountNumber": zod.string().optional(),
+  "containers": zod.string().optional(),
+  "requestPurpose": zod.string().optional(),
+  "relatedLink": zod.string().optional()
 })
 
 
@@ -1151,6 +1194,9 @@ export const GetVendorResponse = zod.object({
   "totalPaid": zod.number(),
   "outstandingBalance": zod.number(),
   "lastPaymentDate": zod.string().optional(),
+  "containers": zod.string().nullish(),
+  "requestPurpose": zod.string().nullish(),
+  "relatedLink": zod.string().nullish(),
   "createdAt": zod.string()
 }).and(zod.object({
   "bills": zod.array(zod.object({
@@ -1179,7 +1225,9 @@ export const GetVendorResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "recentActivity": zod.array(zod.object({
   "id": zod.string(),
@@ -1601,7 +1649,9 @@ export const GetOutstandingLiabilitiesResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 }))
 })
 
@@ -1642,7 +1692,9 @@ export const GetPendingApprovalsResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number(),
   "count": zod.number()
@@ -1685,7 +1737,9 @@ export const GetPaidTodayResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number(),
   "count": zod.number()
@@ -1728,7 +1782,9 @@ export const GetPartialPaymentsResponse = zod.object({
   "paidAt": zod.string().optional(),
   "paymentReference": zod.string().optional(),
   "paidWalletId": zod.string().optional(),
-  "paidWalletName": zod.string().optional()
+  "paidWalletName": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "link": zod.string().nullish()
 })),
   "total": zod.number()
 })

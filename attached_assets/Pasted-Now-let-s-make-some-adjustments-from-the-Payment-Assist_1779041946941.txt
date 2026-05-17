@@ -1,0 +1,68 @@
+Now, let’s make some adjustments from the Payment Assistant (PA) side, specifically in the Vendor and Expense Ledger workflow.
+
+First issue:
+When the PA clicks on Vendor → Add Expense (Expense Ledger), the system sometimes provides two options:
+
+* Add to Existing Bill
+* Create New Bill
+
+But for some vendors, it only shows:
+
+* Create New Bill
+
+without giving the option to “Add to Existing Bill.”
+
+That behavior is incorrect and needs to be fixed.
+
+The system should consistently check whether the vendor already has an existing active/outstanding bill or running balance. If the vendor already exists with an active balance, the PA should always have the option to:
+
+* Add to Existing Bill
+* Create New Bill
+
+This is important because we want the system to behave like a running vendor ledger/accounting structure instead of creating unnecessary duplicate bills.
+
+Second issue:
+When we add to an existing bill, there is a Notes field where the PA can explain what the expense/payment is for. However, after submission, those notes are not clearly visible inside the Expense Ledger or Bill view.
+
+We need the Notes/Description section to display properly so users can easily see:
+
+* What the payment was for
+* Job description
+* Expense explanation
+* Additional remarks
+
+Third adjustment:
+We also need a dedicated field for:
+
+* LINKS(Invoice Link,Document Link,External Reference Link)
+
+This will allow the PA to paste:
+
+* Invoice URLs
+* Google Drive links
+* Uploaded document links
+* External references
+
+directly into the expense/bill.
+
+Fourth adjustment:
+When creating a new vendor, I would also like additional fields such as:
+
+* No. of Containers / Size
+* REQUEST PURPOSE
+* Related Link/Document Link
+
+This is important because many of these expenses are container/job-related, so the vendor should be traceable to:
+
+* Specific container numbers
+* Job references
+* Supporting documents or invoice links
+
+These fields should synchronize across:
+
+* Vendor Profile
+* Expense Ledger
+* Bills & Approval
+* Payment History
+
+so everything remains connected and traceable throughout the system.

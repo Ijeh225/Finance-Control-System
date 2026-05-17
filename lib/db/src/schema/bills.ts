@@ -30,6 +30,8 @@ export const billsTable = pgTable("bills", {
   paymentReference: text("payment_reference"),
   paidWalletId: text("paid_wallet_id"),
   paidWalletName: text("paid_wallet_name"),
+  notes: text("notes"),
+  link: text("link"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
