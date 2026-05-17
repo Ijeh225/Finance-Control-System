@@ -310,7 +310,7 @@ export default function BillsList() {
               <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Invoice #1234 — Q1 supplies" data-testid="input-bill-description" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
                 <Input type="number" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" className="font-mono" data-testid="input-bill-amount" />
@@ -328,7 +328,7 @@ export default function BillsList() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Scheduled Date *</Label>
                 <Input type="date" value={form.scheduledDate} onChange={(e) => setForm(f => ({ ...f, scheduledDate: e.target.value }))} data-testid="input-bill-scheduled-date" />
