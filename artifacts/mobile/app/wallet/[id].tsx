@@ -105,6 +105,7 @@ export default function WalletDetailScreen() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getGetWalletQueryKey(id as string) });
         qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(id as string) });
         setShowFundWallet(false);
         setFundAmount('');
         setFundSource('');
