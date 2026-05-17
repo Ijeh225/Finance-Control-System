@@ -9,7 +9,11 @@ import {
   useGetRecentActivity, getGetRecentActivityQueryKey,
   useGetWalletBalances, getGetWalletBalancesQueryKey,
   useListUsers, getListUsersQueryKey,
+  useGetDashboardCashflow, getGetDashboardCashflowQueryKey,
 } from "@workspace/api-client-react";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +72,12 @@ export default function Dashboard() {
   const { data: walletsData, isLoading: walletsLoading } = useGetWalletBalances({
     query: { queryKey: getGetWalletBalancesQueryKey() },
   });
+
+  const cashflowParams = { days: 30, ...(params ?? {}) };
+  const { data: cashflowData, isLoading: cashflowLoading } = useGetDashboardCashflow(cashflowParams, {
+    query: { queryKey: getGetDashboardCashflowQueryKey(cashflowParams) },
+  });
+
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -274,6 +284,77 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Cash-Flow Chart — 30-day spending trend */}
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm uppercase tracking-wider font-semibold flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" /> 30-Day Cash Flow
+          </CardTitle>
+          <span className="text-xs text-muted-foreground font-medium">Daily payments disbursed</span>
+        </CardHeader>
+        <CardContent>
+          {cashflowLoading || !cashflowData ? (
+            <Skeleton className="h-48 w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={cashflowData.data} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="cashflowGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(d: string) => {
+                    const [, m, day] = d.split("-");
+                    return `${parseInt(day ?? "0")} ${["", "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(m ?? "0")] ?? ""}`;
+                  }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: number) =>
+                    v >= 1_000_000 ? `₦${(v / 1_000_000).toFixed(1)}M`
+                    : v >= 1_000 ? `₦${(v / 1_000).toFixed(0)}K`
+                    : `₦${v}`
+                  }
+                  width={64}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  labelFormatter={(d: string) => {
+                    const dt = new Date(d + "T12:00:00");
+                    return dt.toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short" });
+                  }}
+                  formatter={(v: number) => [formatCurrency(v), "Paid"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  fill="url(#cashflowGradient)"
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column — 2/3 width */}

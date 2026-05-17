@@ -255,6 +255,25 @@ export const GetPaymentHistoryResponse = zod.object({
 
 
 /**
+ * @summary Daily paid totals for the last N days (cash-flow trend)
+ */
+export const getDashboardCashflowQueryDaysDefault = 30;
+
+export const GetDashboardCashflowQueryParams = zod.object({
+  "days": zod.coerce.number().default(getDashboardCashflowQueryDaysDefault).describe('Number of days to look back (max 90)'),
+  "userId": zod.coerce.string().optional().describe('Filter by user ID (MD only)')
+})
+
+export const GetDashboardCashflowResponse = zod.object({
+  "data": zod.array(zod.object({
+  "date": zod.string(),
+  "amount": zod.number()
+})),
+  "days": zod.number()
+})
+
+
+/**
  * @summary List all treasury users
  */
 export const ListUsersResponse = zod.object({

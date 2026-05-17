@@ -223,6 +223,45 @@ paths:
                     type: number
                 required: [bills, total]
 
+  /dashboard/cashflow:
+    get:
+      operationId: getDashboardCashflow
+      tags: [dashboard]
+      summary: Daily paid totals for the last N days (cash-flow trend)
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+          description: Number of days to look back (max 90)
+        - name: userId
+          in: query
+          schema:
+            type: string
+          description: Filter by user ID (MD only)
+      responses:
+        "200":
+          description: Daily cash-flow data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                        amount:
+                          type: number
+                      required: [date, amount]
+                  days:
+                    type: integer
+                required: [data, days]
+
   # ─── USERS ───────────────────────────────────────────────────
   /users:
     get:

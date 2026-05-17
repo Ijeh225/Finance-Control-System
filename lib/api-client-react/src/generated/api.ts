@@ -42,6 +42,8 @@ import type {
   ExportWalletStatementParams,
   GetBillAudit200,
   GetBillComments200,
+  GetDashboardCashflow200,
+  GetDashboardCashflowParams,
   GetDashboardSummaryParams,
   GetOutstandingLiabilitiesParams,
   GetOverdueBills200,
@@ -761,6 +763,90 @@ export function useGetPaymentHistory<TData = Awaited<ReturnType<typeof getPaymen
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetPaymentHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDashboardCashflowUrl = (params?: GetDashboardCashflowParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/cashflow?${stringifiedParams}` : `/api/dashboard/cashflow`
+}
+
+/**
+ * @summary Daily paid totals for the last N days (cash-flow trend)
+ */
+export const getDashboardCashflow = async (params?: GetDashboardCashflowParams, options?: RequestInit): Promise<GetDashboardCashflow200> => {
+
+  return customFetch<GetDashboardCashflow200>(getGetDashboardCashflowUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardCashflowQueryKey = (params?: GetDashboardCashflowParams,) => {
+    return [
+    `/api/dashboard/cashflow`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDashboardCashflowQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardCashflow>>, TError = ErrorType<unknown>>(params?: GetDashboardCashflowParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardCashflow>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardCashflowQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardCashflow>>> = ({ signal }) => getDashboardCashflow(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardCashflow>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardCashflowQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardCashflow>>>
+export type GetDashboardCashflowQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Daily paid totals for the last N days (cash-flow trend)
+ */
+
+export function useGetDashboardCashflow<TData = Awaited<ReturnType<typeof getDashboardCashflow>>, TError = ErrorType<unknown>>(
+ params?: GetDashboardCashflowParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardCashflow>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardCashflowQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

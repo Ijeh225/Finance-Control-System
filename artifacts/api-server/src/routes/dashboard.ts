@@ -173,6 +173,39 @@ router.get("/dashboard/activity", async (req, res): Promise<void> => {
   res.json({ activities: rows });
 });
 
+router.get("/dashboard/cashflow", async (req, res): Promise<void> => {
+  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
+  const days = Math.min(Math.max(parseInt(String(req.query["days"] ?? "30")), 1), 90);
+
+  const cutoff = new Date(Date.now() - days * 86400000);
+
+  const conditions = [
+    eq(billsTable.status, "paid"),
+    gte(billsTable.paidAt, cutoff),
+  ];
+  if (userId) conditions.push(eq(billsTable.createdBy, userId));
+
+  const bills = await db
+    .select({ paidAt: billsTable.paidAt, paidAmount: billsTable.paidAmount })
+    .from(billsTable)
+    .where(and(...conditions));
+
+  // Build a zero-filled bucket for each day in the window
+  const buckets = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0]!;
+    buckets.set(d, 0);
+  }
+  for (const bill of bills) {
+    if (!bill.paidAt) continue;
+    const d = (bill.paidAt as Date).toISOString().split("T")[0]!;
+    if (buckets.has(d)) buckets.set(d, (buckets.get(d) ?? 0) + parseFloat(String(bill.paidAmount ?? 0)));
+  }
+
+  const data = Array.from(buckets.entries()).map(([date, amount]) => ({ date, amount }));
+  res.json({ data, days });
+});
+
 function formatBill(b: Record<string, unknown>) {
   return {
     ...b,

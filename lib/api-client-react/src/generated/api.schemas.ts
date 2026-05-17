@@ -485,6 +485,27 @@ export type GetPaymentHistory200 = {
   total: number;
 };
 
+export type GetDashboardCashflowParams = {
+/**
+ * Number of days to look back (max 90)
+ */
+days?: number;
+/**
+ * Filter by user ID (MD only)
+ */
+userId?: string;
+};
+
+export type GetDashboardCashflow200DataItem = {
+  date: string;
+  amount: number;
+};
+
+export type GetDashboardCashflow200 = {
+  data: GetDashboardCashflow200DataItem[];
+  days: number;
+};
+
 export type ListUsers200 = {
   users: User[];
 };
