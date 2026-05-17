@@ -165,11 +165,18 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
     updates["vendorName"] = vendor.name;
   }
   if (description) updates["description"] = description;
+  let amountDelta = 0;
+  let outstandingDelta = 0;
   if (amount !== undefined) {
+    const oldAmount = parseFloat(String(existing.amount ?? 0));
     const paidAmount = parseFloat(String(existing.paidAmount ?? 0));
     const newAmount = parseFloat(String(amount));
+    const oldOutstanding = parseFloat(String(existing.outstandingBalance ?? 0));
+    const newOutstanding = Math.max(0, newAmount - paidAmount);
+    amountDelta = newAmount - oldAmount;
+    outstandingDelta = newOutstanding - oldOutstanding;
     updates["amount"] = String(newAmount);
-    updates["outstandingBalance"] = String(Math.max(0, newAmount - paidAmount));
+    updates["outstandingBalance"] = String(newOutstanding);
   }
   if (scheduledDate) updates["scheduledDate"] = scheduledDate;
   if (dueDate !== undefined) updates["dueDate"] = dueDate || null;
@@ -183,6 +190,19 @@ router.patch("/bills/:id", async (req, res): Promise<void> => {
 
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+
+  // Keep vendor totals in sync when the amount changed
+  if (amountDelta !== 0 || outstandingDelta !== 0) {
+    const deltaStr = (n: number) => String(Math.abs(n));
+    await db.update(vendorsTable).set({
+      totalBilled: amountDelta >= 0
+        ? sql`${vendorsTable.totalBilled} + ${deltaStr(amountDelta)}`
+        : sql`GREATEST(0, ${vendorsTable.totalBilled} - ${deltaStr(amountDelta)})`,
+      outstandingBalance: outstandingDelta >= 0
+        ? sql`${vendorsTable.outstandingBalance} + ${deltaStr(outstandingDelta)}`
+        : sql`GREATEST(0, ${vendorsTable.outstandingBalance} - ${deltaStr(outstandingDelta)})`,
+    }).where(eq(vendorsTable.id, existing.vendorId));
+  }
 
   await addAudit(rawId!, actor.id, actor.name, "edited", "Bill details updated");
   res.json(formatBill(bill as unknown as Record<string, unknown>));

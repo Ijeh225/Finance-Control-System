@@ -73,6 +73,39 @@ async function wipeDemoData() {
 }
 
 /**
+ * Recomputes vendor totalBilled / totalPaid / outstandingBalance from actual
+ * bill rows. Runs on every startup to self-heal any stale cached totals
+ * (e.g. caused by editing a bill amount before this fix was deployed).
+ */
+async function reconcileVendorTotals() {
+  const vendors = await db.select({ id: vendorsTable.id }).from(vendorsTable);
+  if (vendors.length === 0) return;
+
+  for (const { id } of vendors) {
+    const bills = await db
+      .select({
+        amount: billsTable.amount,
+        paidAmount: billsTable.paidAmount,
+        outstandingBalance: billsTable.outstandingBalance,
+      })
+      .from(billsTable)
+      .where(eq(billsTable.vendorId, id));
+
+    const totalBilled = bills.reduce((s, b) => s + parseFloat(String(b.amount ?? 0)), 0);
+    const totalPaid   = bills.reduce((s, b) => s + parseFloat(String(b.paidAmount ?? 0)), 0);
+    const outstanding = bills.reduce((s, b) => s + parseFloat(String(b.outstandingBalance ?? 0)), 0);
+
+    await db.update(vendorsTable).set({
+      totalBilled:        String(totalBilled.toFixed(2)),
+      totalPaid:          String(totalPaid.toFixed(2)),
+      outstandingBalance: String(outstanding.toFixed(2)),
+    }).where(eq(vendorsTable.id, id));
+  }
+
+  logger.info({ count: vendors.length }, "Vendor totals reconciled.");
+}
+
+/**
  * Ensures the MD account exists on startup. Nothing else is seeded.
  * All vendors, wallets, and bills are created by the user through the app.
  */
@@ -80,6 +113,9 @@ export async function seedIfEmpty() {
   try {
     // Always run demo cleanup first (removes Asst A + seeded data if present)
     await wipeDemoData();
+
+    // Recompute vendor totals in case any bill edits left them stale
+    await reconcileVendorTotals();
 
     const [md] = await db
       .select()
