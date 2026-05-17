@@ -1,6 +1,10 @@
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
-import { db, notificationsTable } from "@workspace/db";
+import { db, notificationsTable, auditTable } from "@workspace/db";
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+}
 
 const router: IRouter = Router();
 
@@ -42,6 +46,33 @@ router.post("/notifications/read-all", async (req, res): Promise<void> => {
     .where(and(eq(notificationsTable.userId, actor.id), eq(notificationsTable.isRead, false)))
     .returning();
   res.json({ updated: updated.length });
+});
+
+// ─── Delete notification ───────────────────────────────────────────────────────
+
+router.delete("/notifications/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const [existing] = await db
+    .select()
+    .from(notificationsTable)
+    .where(eq(notificationsTable.id, rawId!));
+  if (!existing) { res.status(404).json({ error: "Notification not found" }); return; }
+  // Only owner or MD may delete
+  if (actor.role !== "md" && existing.userId !== actor.id) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  await db.delete(notificationsTable).where(eq(notificationsTable.id, rawId!));
+  // Audit trail — billId is optional so link it when available
+  await db.insert(auditTable).values({
+    id: uid(),
+    billId: existing.billId ?? null,
+    userId: actor.id,
+    userName: actor.name,
+    action: "notification_deleted",
+    details: `Notification deleted: "${existing.title}"`,
+  });
+  res.json({ success: true });
 });
 
 export default router;

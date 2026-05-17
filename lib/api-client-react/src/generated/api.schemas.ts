@@ -664,6 +664,10 @@ export type ListNotifications200 = {
   unreadCount: number;
 };
 
+export type DeleteNotification200 = {
+  success: boolean;
+};
+
 export type MarkAllNotificationsReadBody = {
   userId: string;
 };

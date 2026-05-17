@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   useListNotifications, getListNotificationsQueryKey,
   useMarkNotificationRead, useMarkAllNotificationsRead,
+  useDeleteNotification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDateTime } from "@/lib/format";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Bell, BellOff, CheckCheck,
+  Bell, BellOff, CheckCheck, Trash2,
   CheckCircle2, XCircle, CircleDashed, PauseCircle,
   MessageCircle, AlertTriangle, Clock, Copy, ArrowUpCircle, Paperclip, Wallet, ChevronRight,
 } from "lucide-react";
@@ -29,7 +30,7 @@ interface IconConfig {
 const NOTIF_ICON_MAP: Record<string, IconConfig> = {
   bill_approved: {
     Icon: CheckCircle2,
-    bg: "bg-emerald-100", color: "text-emerald-500",
+    bg: "bg-emerald-100", color: "text-emerald-400",
     bgUnread: "bg-emerald-100", colorUnread: "text-emerald-600",
   },
   bill_rejected: {
@@ -97,52 +98,123 @@ function NotifIcon({ type, unread }: { type: string; unread: boolean }) {
   );
 }
 
+type Notif = {
+  id: string;
+  type?: string | null;
+  title: string;
+  body: string;
+  billId?: string | null;
+  isRead?: boolean | null;
+  createdAt?: string | null;
+};
+
+interface NotifRowProps {
+  notif: Notif;
+  onRead: (id: string) => void;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}
+
+function NotifRow({ notif, onRead, onDelete, isDeleting }: NotifRowProps) {
+  const [, setLocation] = useLocation();
+  const isUnread = !notif.isRead;
+  const isClickable = !!notif.billId;
+
+  function handleClick() {
+    if (isUnread) onRead(notif.id);
+    if (notif.billId) setLocation(`/bills/${notif.billId}`);
+  }
+
+  return (
+    <div
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={handleClick}
+      onKeyDown={(e) => e.key === "Enter" && handleClick()}
+      className={`p-4 flex gap-4 transition-colors select-none group
+        ${isUnread ? "bg-primary/5" : ""}
+        ${isClickable ? "cursor-pointer hover:bg-primary/10 active:bg-primary/15" : "hover:bg-muted/30"}
+      `}
+      data-testid={`notification-${notif.id}`}
+    >
+      <NotifIcon type={notif.type ?? ""} unread={isUnread} />
+
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-semibold leading-snug ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
+          {notif.title}
+        </p>
+        <p className="text-sm text-muted-foreground mt-0.5">{notif.body}</p>
+        <p className="text-xs text-muted-foreground/60 font-mono mt-1">{formatDateTime(notif.createdAt ?? undefined)}</p>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {isUnread && <div className="w-2 h-2 rounded-full bg-primary mt-0.5" />}
+        {isClickable && <ChevronRight className="w-4 h-4 text-muted-foreground/40" />}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+          disabled={isDeleting}
+          title="Delete notification"
+          onClick={(e) => { e.stopPropagation(); onDelete(notif.id); }}
+          data-testid={`button-delete-notif-${notif.id}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function Notifications() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
 
+  const queryKey = getListNotificationsQueryKey({ userId: user?.id ?? "" });
+
   const { data, isLoading } = useListNotifications(
     { userId: user?.id ?? "" },
-    { query: { enabled: !!user?.id, queryKey: getListNotificationsQueryKey({ userId: user?.id ?? "" }) } }
+    { query: { enabled: !!user?.id, queryKey } }
   );
 
+  const invalidate = () => qc.invalidateQueries({ queryKey });
+
   const markRead = useMarkNotificationRead({
-    mutation: {
-      onSuccess: () => qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ userId: user?.id ?? "" }) }),
-    },
+    mutation: { onSuccess: invalidate },
   });
 
   const markAll = useMarkAllNotificationsRead({
     mutation: {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ userId: user?.id ?? "" }) });
-        toast({ title: "All notifications marked as read" });
-      },
+      onSuccess: () => { invalidate(); toast({ title: "All notifications marked as read" }); },
       onError: () => toast({ title: "Failed to mark all as read", variant: "destructive" }),
     },
   });
 
-  const unreadCount = data?.unreadCount ?? 0;
-  const [, setLocation] = useLocation();
+  const deleteNotif = useDeleteNotification({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Notification deleted" }); },
+      onError: () => toast({ title: "Failed to delete notification", variant: "destructive" }),
+    },
+  });
 
-  function handleNotifClick(notif: { id: string; billId?: string | null; isRead?: boolean | null }) {
-    if (!notif.isRead) {
-      markRead.mutate({ id: notif.id });
-    }
-    if (notif.billId) {
-      setLocation(`/bills/${notif.billId}`);
-    }
-  }
+  const all = data?.notifications ?? [];
+  const unread = all.filter(n => !n.isRead);
+  const read = all.filter(n => n.isRead);
+  const unreadCount = data?.unreadCount ?? 0;
 
   return (
     <div className="p-6 md:p-10 max-w-3xl mx-auto space-y-6">
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             Notifications
             {unreadCount > 0 && (
-              <Badge className="bg-primary text-primary-foreground font-bold" data-testid="badge-unread-count">{unreadCount}</Badge>
+              <Badge className="bg-primary text-primary-foreground font-bold" data-testid="badge-unread-count">
+                {unreadCount}
+              </Badge>
             )}
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Activity alerts and bill status updates.</p>
@@ -161,78 +233,105 @@ export default function Notifications() {
         )}
       </div>
 
-      <Card className="shadow-sm">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="divide-y">
-              {[1,2,3,4,5].map(i => (
-                <div key={i} className="p-4 flex gap-3">
-                  <Skeleton className="w-9 h-9 rounded-full shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
+      {/* ── Loading ── */}
+      {isLoading && (
+        <Card className="shadow-sm">
+          <CardContent className="p-0 divide-y">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="p-4 flex gap-3">
+                <Skeleton className="w-9 h-9 rounded-full shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
-              ))}
-            </div>
-          ) : !data?.notifications?.length ? (
-            <div className="p-16 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <BellOff className="w-8 h-8 text-muted-foreground/50" />
               </div>
-              <h3 className="text-lg font-bold">All caught up</h3>
-              <p className="text-sm text-muted-foreground mt-2">No notifications to show.</p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Empty state ── */}
+      {!isLoading && all.length === 0 && (
+        <Card className="shadow-sm">
+          <CardContent className="p-16 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <BellOff className="w-8 h-8 text-muted-foreground/50" />
             </div>
-          ) : (
-            <div className="divide-y">
-              {data.notifications.map((notif) => {
-                const isClickable = !!notif.billId;
-                return (
-                  <div
+            <h3 className="text-lg font-bold">All caught up</h3>
+            <p className="text-sm text-muted-foreground mt-2">No notifications to show.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Unread section ── */}
+      {!isLoading && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Unread
+            </h2>
+            {unread.length > 0 && (
+              <span className="text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                {unread.length}
+              </span>
+            )}
+          </div>
+
+          <Card className="shadow-sm">
+            <CardContent className="p-0">
+              {unread.length === 0 ? (
+                <div className="p-8 flex flex-col items-center text-center gap-2">
+                  <CheckCheck className="w-6 h-6 text-emerald-500" />
+                  <p className="text-sm text-muted-foreground font-medium">You're all caught up — no unread messages.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {unread.map(notif => (
+                    <NotifRow
+                      key={notif.id}
+                      notif={notif}
+                      onRead={(id) => markRead.mutate({ id })}
+                      onDelete={(id) => deleteNotif.mutate({ id })}
+                      isDeleting={deleteNotif.isPending}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Read section ── */}
+      {!isLoading && read.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Read
+            </h2>
+            <span className="text-xs font-semibold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+              {read.length}
+            </span>
+          </div>
+
+          <Card className="shadow-sm opacity-80">
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {read.map(notif => (
+                  <NotifRow
                     key={notif.id}
-                    role={isClickable ? "button" : undefined}
-                    tabIndex={isClickable ? 0 : undefined}
-                    onClick={() => handleNotifClick(notif)}
-                    onKeyDown={(e) => e.key === "Enter" && handleNotifClick(notif)}
-                    className={`p-4 flex gap-4 transition-colors select-none
-                      ${!notif.isRead ? "bg-primary/5" : ""}
-                      ${isClickable ? "cursor-pointer hover:bg-primary/10 active:bg-primary/15" : "hover:bg-muted/30"}
-                    `}
-                    data-testid={`notification-${notif.id}`}
-                  >
-                    <NotifIcon type={notif.type ?? ""} unread={!notif.isRead} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className={`text-sm font-semibold ${!notif.isRead ? "text-foreground" : "text-muted-foreground"}`}>{notif.title}</p>
-                          <p className="text-sm text-muted-foreground mt-0.5">{notif.body}</p>
-                          <p className="text-xs text-muted-foreground/60 font-mono mt-1">{formatDateTime(notif.createdAt)}</p>
-                        </div>
-                        {!notif.isRead && !isClickable && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0 h-7 text-xs text-primary hover:text-primary"
-                            disabled={markRead.isPending}
-                            onClick={(e) => { e.stopPropagation(); markRead.mutate({ id: notif.id }); }}
-                            data-testid={`button-mark-read-${notif.id}`}
-                          >
-                            Mark read
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {!notif.isRead && <div className="w-2 h-2 rounded-full bg-primary mt-0.5" />}
-                      {isClickable && <ChevronRight className="w-4 h-4 text-muted-foreground/40" />}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    notif={notif}
+                    onRead={(id) => markRead.mutate({ id })}
+                    onDelete={(id) => deleteNotif.mutate({ id })}
+                    isDeleting={deleteNotif.isPending}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }

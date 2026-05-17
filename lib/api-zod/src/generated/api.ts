@@ -1492,6 +1492,18 @@ export const MarkNotificationReadResponse = zod.object({
 
 
 /**
+ * @summary Delete a notification (owner or MD)
+ */
+export const DeleteNotificationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteNotificationResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Mark all notifications as read
  */
 export const MarkAllNotificationsReadBody = zod.object({
