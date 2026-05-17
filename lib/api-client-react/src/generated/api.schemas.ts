@@ -117,6 +117,7 @@ export const BillStatus = {
   partial: 'partial',
   paid: 'paid',
   overdue: 'overdue',
+  withdrawn: 'withdrawn',
 } as const;
 
 export interface Bill {
@@ -134,6 +135,9 @@ export interface Bill {
   walletName?: string;
   priority: BillPriority;
   status: BillStatus;
+  withdrawnAt?: string | null;
+  withdrawnBy?: string | null;
+  withdrawnByName?: string | null;
   createdBy: string;
   createdByName: string;
   hasAttachment?: boolean;
@@ -614,10 +618,6 @@ export type EscalateBillBody = {
   comment?: string;
 };
 
-export type WithdrawBill200 = {
-  success?: boolean;
-};
-
 export type RescheduleBillBody = {
   /** New scheduled date in YYYY-MM-DD format */
   scheduledDate: string;
@@ -667,6 +667,19 @@ export type ListVendors200 = {
 
 export type DeleteVendor200 = {
   success?: boolean;
+};
+
+export type GetVendorSpending200MonthsItem = {
+  /** YYYY-MM format */
+  month: string;
+  amount: number;
+};
+
+export type GetVendorSpending200 = {
+  vendorId: string;
+  vendorName: string;
+  totalPaid: number;
+  months: GetVendorSpending200MonthsItem[];
 };
 
 export type ListWalletsParams = {

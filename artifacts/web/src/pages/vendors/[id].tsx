@@ -3,6 +3,7 @@ import { useParams, useLocation } from "wouter";
 import {
   useGetVendor, getGetVendorQueryKey,
   useGetVendorLiabilities, getGetVendorLiabilitiesQueryKey,
+  useGetVendorSpending, getGetVendorSpendingQueryKey,
   useUpdateBill, useDeleteVendor, useUpdateVendor,
   getListVendorsQueryKey,
 } from "@workspace/api-client-react";
@@ -30,6 +31,7 @@ const STATUS_COLORS: Record<string, string> = {
   partial: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   paid: "bg-teal-500/10 text-teal-600 border-teal-500/20",
   overdue: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+  withdrawn: "bg-slate-200/60 text-slate-500 border-slate-300/50",
 };
 
 const ACTIVE_STATUSES = new Set(["pending", "approved", "partial", "on_hold", "overdue"]);
@@ -87,6 +89,9 @@ export default function VendorDetail() {
   });
   const { data: liabilities, isLoading: liabLoading } = useGetVendorLiabilities(id!, {
     query: { enabled: !!id, queryKey: getGetVendorLiabilitiesQueryKey(id!) },
+  });
+  const { data: spending } = useGetVendorSpending(id!, {
+    query: { enabled: !!id, queryKey: getGetVendorSpendingQueryKey(id!) },
   });
 
   const updateBill = useUpdateBill({
@@ -322,6 +327,46 @@ export default function VendorDetail() {
             <div className="mt-3 pt-3 border-t text-right">
               <span className="text-xs font-semibold uppercase text-muted-foreground mr-2">Total Outstanding</span>
               <span className="text-lg font-bold font-mono">{formatCurrency(liabilities.totalOutstanding ?? 0)}</span>
+
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {spending && spending.months.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-sm uppercase tracking-wider font-semibold">Payment Spending Summary</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Monthly breakdown of confirmed payments made to this vendor.</p>
+              </div>
+              <span className="text-xs font-semibold text-muted-foreground font-mono shrink-0 mt-1">
+                Total: {formatCurrency(spending.totalPaid)}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {spending.months.map(({ month, amount }) => {
+                const [yr, mo] = month.split("-");
+                const label = new Date(Number(yr), Number(mo) - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+                const pct = spending.totalPaid > 0 ? Math.round((amount / spending.totalPaid) * 100) : 0;
+                return (
+                  <div key={month} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{label}</p>
+                      <div className="mt-1.5 h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-teal-500 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold font-mono text-teal-700">{formatCurrency(amount)}</p>
+                      <p className="text-xs text-muted-foreground">{pct}%</p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, vendorsTable, billsTable, auditTable } from "@workspace/db";
+import { eq, ilike, and, sql, ne } from "drizzle-orm";
+import { db, vendorsTable, billsTable, auditTable, walletTransactionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -49,7 +49,10 @@ router.get("/vendors/:id", async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
-  const bills = await db.select().from(billsTable).where(eq(billsTable.vendorId, rawId!));
+  // Exclude withdrawn bills from the vendor ledger view
+  const bills = await db.select().from(billsTable).where(
+    and(eq(billsTable.vendorId, rawId!), ne(billsTable.status, "withdrawn"))
+  );
   const activity = await db.select().from(auditTable)
     .where(sql`${auditTable.billId} IN (SELECT id FROM bills WHERE vendor_id = ${rawId})`)
     .limit(20);
@@ -102,6 +105,41 @@ router.delete("/vendors/:id", async (req, res): Promise<void> => {
   await db.delete(vendorsTable).where(eq(vendorsTable.id, rawId!));
   req.log.info({ vendorId: rawId, actor: actor.id }, "Vendor deleted by MD");
   res.json({ success: true });
+});
+
+router.get("/vendors/:id/spending", async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
+  if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
+
+  // Get all bill_payment wallet transactions linked to bills belonging to this vendor
+  const txRows = await db.select({
+    amount: walletTransactionsTable.amount,
+    createdAt: walletTransactionsTable.createdAt,
+  }).from(walletTransactionsTable)
+    .where(sql`
+      ${walletTransactionsTable.type} = 'bill_payment'
+      AND ${walletTransactionsTable.relatedBillId} IN (
+        SELECT id FROM bills WHERE vendor_id = ${rawId}
+      )
+    `);
+
+  // Bucket by YYYY-MM
+  const buckets = new Map<string, number>();
+  let totalPaid = 0;
+  for (const tx of txRows) {
+    const amt = parseFloat(String(tx.amount));
+    totalPaid += amt;
+    const month = tx.createdAt.toISOString().slice(0, 7); // "YYYY-MM"
+    buckets.set(month, (buckets.get(month) ?? 0) + amt);
+  }
+
+  // Sort ascending and build array
+  const months = Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, amount]) => ({ month, amount }));
+
+  res.json({ vendorId: rawId, vendorName: vendor.name, totalPaid, months });
 });
 
 router.get("/vendors/:id/liabilities", async (req, res): Promise<void> => {

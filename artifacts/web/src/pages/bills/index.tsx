@@ -39,6 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
   partial: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   paid: "bg-teal-500/10 text-teal-600 border-teal-500/20",
   overdue: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+  withdrawn: "bg-slate-200/60 text-slate-500 border-slate-300/50",
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -48,7 +49,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-red-50 text-red-700",
 };
 
-const STATUSES = ["pending", "approved", "rejected", "on_hold", "partial", "paid", "overdue"];
+const STATUSES = ["pending", "approved", "rejected", "on_hold", "partial", "paid", "overdue", "withdrawn"];
 const PRIORITIES = ["low", "medium", "high", "urgent"];
 
 export default function BillsList() {

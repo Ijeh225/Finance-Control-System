@@ -64,6 +64,7 @@ import type {
   GetScheduledTodayParams,
   GetScheduledTomorrow200,
   GetScheduledTomorrowParams,
+  GetVendorSpending200,
   GetWalletBalances200,
   GetWalletStatementParams,
   HealthStatus,
@@ -104,8 +105,7 @@ import type {
   VendorDetail,
   Wallet,
   WalletDetail,
-  WalletStatement,
-  WithdrawBill200
+  WalletStatement
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2049,11 +2049,11 @@ export const getWithdrawBillUrl = (id: string,) => {
 }
 
 /**
- * @summary Withdraw a pending bill (creator only)
+ * @summary Withdraw a pending bill (creator only) — soft-deletes for audit
  */
-export const withdrawBill = async (id: string, options?: RequestInit): Promise<WithdrawBill200> => {
+export const withdrawBill = async (id: string, options?: RequestInit): Promise<Bill> => {
 
-  return customFetch<WithdrawBill200>(getWithdrawBillUrl(id),
+  return customFetch<Bill>(getWithdrawBillUrl(id),
   {
     ...options,
     method: 'POST'
@@ -2097,7 +2097,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type WithdrawBillMutationError = ErrorType<unknown>
 
     /**
- * @summary Withdraw a pending bill (creator only)
+ * @summary Withdraw a pending bill (creator only) — soft-deletes for audit
  */
 export const useWithdrawBill = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawBill>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -3372,6 +3372,83 @@ export const useDeleteVendor = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteVendorMutationOptions(options));
     }
+
+export const getGetVendorSpendingUrl = (id: string,) => {
+
+
+
+
+  return `/api/vendors/${id}/spending`
+}
+
+/**
+ * @summary Get per-vendor payment spending summary with monthly breakdown
+ */
+export const getVendorSpending = async (id: string, options?: RequestInit): Promise<GetVendorSpending200> => {
+
+  return customFetch<GetVendorSpending200>(getGetVendorSpendingUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVendorSpendingQueryKey = (id: string,) => {
+    return [
+    `/api/vendors/${id}/spending`
+    ] as const;
+    }
+
+
+export const getGetVendorSpendingQueryOptions = <TData = Awaited<ReturnType<typeof getVendorSpending>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorSpending>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVendorSpendingQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVendorSpending>>> = ({ signal }) => getVendorSpending(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVendorSpending>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVendorSpendingQueryResult = NonNullable<Awaited<ReturnType<typeof getVendorSpending>>>
+export type GetVendorSpendingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get per-vendor payment spending summary with monthly breakdown
+ */
+
+export function useGetVendorSpending<TData = Awaited<ReturnType<typeof getVendorSpending>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVendorSpending>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVendorSpendingQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetVendorLiabilitiesUrl = (id: string,) => {
 

@@ -49,6 +49,7 @@ const STATUS_COLORS: Record<string, string> = {
   partial: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   paid: "bg-teal-500/10 text-teal-600 border-teal-500/20",
   overdue: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+  withdrawn: "bg-slate-200/60 text-slate-500 border-slate-300/50",
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -362,6 +363,21 @@ export default function BillDetail() {
         </Button>
       </div>
 
+      {bill.status === "withdrawn" && (
+        <div className="rounded-md border border-slate-300/60 bg-slate-100/70 px-4 py-3 flex items-start gap-3">
+          <Trash2 className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+          <div className="text-sm text-slate-600 space-y-0.5">
+            <p className="font-semibold">This bill has been archived</p>
+            {(bill as any).withdrawnByName && (
+              <p className="text-xs text-slate-500">
+                Archived by <span className="font-medium">{(bill as any).withdrawnByName}</span>
+                {(bill as any).withdrawnAt ? ` on ${formatDateTime((bill as any).withdrawnAt)}` : ""}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-bill-vendor">{bill.vendorName}</h1>
@@ -397,14 +413,11 @@ export default function BillDetail() {
           {canWithdraw && (
             <Button
               size="sm"
-              variant="destructive"
+              variant="outline"
+              className="border-slate-400 text-slate-600 hover:bg-slate-50"
               disabled={withdraw.isPending}
               data-testid="button-withdraw-bill"
-              onClick={() => {
-                if (window.confirm("This will permanently delete the bill and cannot be undone. Withdraw?")) {
-                  withdraw.mutate({ id: id! });
-                }
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />
               {withdraw.isPending ? "Withdrawing…" : "Withdraw"}
@@ -1186,27 +1199,44 @@ export default function BillDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete / Withdraw Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-destructive">Delete Bill?</DialogTitle>
+            <DialogTitle className={canWithdraw ? "text-slate-700" : "text-destructive"}>
+              {canWithdraw ? "Withdraw Bill?" : "Archive Bill?"}
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This will permanently delete the bill for <strong>{bill?.vendorName}</strong> ({formatCurrency(bill?.amount ?? 0)}) and all associated comments, attachments, and audit records. Vendor totals will be reversed. This action cannot be undone.
+            {canWithdraw
+              ? <>This will archive the bill for <strong>{bill?.vendorName}</strong> ({formatCurrency(bill?.amount ?? 0)}). The bill record and audit trail will be preserved but it will be removed from the active list. This cannot be undone.</>
+              : <>This will archive the bill for <strong>{bill?.vendorName}</strong> ({formatCurrency(bill?.amount ?? 0)}) and reverse all vendor totals. The record is preserved for audit. This cannot be undone.</>
+            }
           </p>
           <DialogFooter className="gap-2 mt-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteBill.isPending}>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteBill.isPending || withdraw.isPending}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteBill.isPending}
-              data-testid="button-confirm-delete-bill"
-              onClick={() => deleteBill.mutate({ id: id! })}
-            >
-              {deleteBill.isPending ? "Deleting…" : "Yes, Delete Permanently"}
-            </Button>
+            {canWithdraw ? (
+              <Button
+                variant="outline"
+                className="border-slate-400 text-slate-700 hover:bg-slate-50"
+                disabled={withdraw.isPending}
+                data-testid="button-confirm-withdraw-bill"
+                onClick={() => { setShowDeleteConfirm(false); withdraw.mutate({ id: id! }); }}
+              >
+                {withdraw.isPending ? "Withdrawing…" : "Yes, Withdraw"}
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                disabled={deleteBill.isPending}
+                data-testid="button-confirm-delete-bill"
+                onClick={() => deleteBill.mutate({ id: id! })}
+              >
+                {deleteBill.isPending ? "Archiving…" : "Yes, Archive"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

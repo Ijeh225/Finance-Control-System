@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, asc, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -100,7 +100,12 @@ router.get("/bills", async (req, res): Promise<void> => {
 
   const conditions: ReturnType<typeof eq>[] = [];
   if (effectiveUserId) conditions.push(eq(billsTable.createdBy, effectiveUserId));
-  if (status) conditions.push(eq(billsTable.status, status as "pending"));
+  if (status) {
+    conditions.push(eq(billsTable.status, status as "pending"));
+  } else {
+    // Exclude withdrawn bills from default list — they are archived
+    conditions.push(ne(billsTable.status, "withdrawn"));
+  }
   if (vendorId) conditions.push(eq(billsTable.vendorId, vendorId));
   if (priority) conditions.push(eq(billsTable.priority, priority as "low"));
   if (from) conditions.push(gte(billsTable.scheduledDate, from));
@@ -505,7 +510,7 @@ router.delete("/bills/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(billsTable).where(eq(billsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Bill not found" }); return; }
 
-  // Reverse vendor financial totals
+  // Reverse vendor financial totals so aggregate stays accurate
   const amount = parseFloat(String(existing.amount));
   const paidAmt = parseFloat(String(existing.paidAmount ?? 0));
   const outstanding = parseFloat(String(existing.outstandingBalance ?? 0));
@@ -515,13 +520,17 @@ router.delete("/bills/:id", async (req, res): Promise<void> => {
     outstandingBalance: sql`GREATEST(0, ${vendorsTable.outstandingBalance} - ${String(outstanding)})`,
   }).where(eq(vendorsTable.id, existing.vendorId));
 
-  // Delete all related records
-  await db.delete(commentsTable).where(eq(commentsTable.billId, rawId!));
-  await db.delete(auditTable).where(eq(auditTable.billId, rawId!));
-  await db.delete(billAttachmentsTable).where(eq(billAttachmentsTable.billId, rawId!));
-  await db.delete(billsTable).where(eq(billsTable.id, rawId!));
-  req.log.info({ billId: rawId, actor: actor.id }, "Bill deleted by MD");
-  res.json({ success: true });
+  // Soft-delete: mark as withdrawn so the record is preserved for audit
+  const now = new Date();
+  const [updated] = await db.update(billsTable).set({
+    status: "withdrawn",
+    withdrawnAt: now,
+    withdrawnBy: actor.id,
+    withdrawnByName: actor.name,
+  }).where(eq(billsTable.id, rawId!)).returning();
+  await addAudit(rawId!, actor.id, actor.name, "deleted", `Bill archived by MD (${actor.name})`);
+  req.log.info({ billId: rawId, actor: actor.id }, "Bill archived by MD");
+  res.json(formatBill(updated as unknown as Record<string, unknown>));
 });
 
 // ─── Withdraw ────────────────────────────────────────────────────────────────
@@ -538,12 +547,26 @@ router.post("/bills/:id/withdraw", async (req, res): Promise<void> => {
   if (bill.status !== "pending") {
     res.status(400).json({ error: "Only pending bills can be withdrawn" }); return;
   }
-  await db.delete(commentsTable).where(eq(commentsTable.billId, rawId!));
-  await db.delete(auditTable).where(eq(auditTable.billId, rawId!));
-  await db.delete(billAttachmentsTable).where(eq(billAttachmentsTable.billId, rawId!));
-  await db.delete(billsTable).where(eq(billsTable.id, rawId!));
-  req.log.info({ billId: rawId, actor: actor.id }, "Bill withdrawn");
-  res.json({ success: true });
+
+  // Soft-delete: flip status to withdrawn, preserve all records
+  const now = new Date();
+  const [updated] = await db.update(billsTable).set({
+    status: "withdrawn",
+    withdrawnAt: now,
+    withdrawnBy: actor.id,
+    withdrawnByName: actor.name,
+  }).where(eq(billsTable.id, rawId!)).returning();
+
+  // Reverse vendor financial totals
+  const amount = parseFloat(String(bill.amount));
+  await db.update(vendorsTable).set({
+    totalBilled: sql`GREATEST(0, ${vendorsTable.totalBilled} - ${String(amount)})`,
+    outstandingBalance: sql`GREATEST(0, ${vendorsTable.outstandingBalance} - ${String(amount)})`,
+  }).where(eq(vendorsTable.id, bill.vendorId));
+
+  await addAudit(rawId!, actor.id, actor.name, "withdrawn", `Bill withdrawn by ${actor.name}`);
+  req.log.info({ billId: rawId, actor: actor.id }, "Bill withdrawn (soft-deleted)");
+  res.json(formatBill(updated as unknown as Record<string, unknown>));
 });
 
 // ─── Payment History ─────────────────────────────────────────────────────────

@@ -656,7 +656,7 @@ paths:
     post:
       operationId: withdrawBill
       tags: [bills]
-      summary: Withdraw a pending bill (creator only)
+      summary: Withdraw a pending bill (creator only) — soft-deletes for audit
       parameters:
         - name: id
           in: path
@@ -665,14 +665,11 @@ paths:
             type: string
       responses:
         "200":
-          description: Bill withdrawn and deleted
+          description: Bill soft-deleted and returned with withdrawn status
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
+                $ref: "#/components/schemas/Bill"
 
   /bills/{id}/pay:
     post:
@@ -1098,6 +1095,44 @@ paths:
                 properties:
                   success:
                     type: boolean
+
+  /vendors/{id}/spending:
+    get:
+      operationId: getVendorSpending
+      tags: [vendors]
+      summary: Get per-vendor payment spending summary with monthly breakdown
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor spending summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vendorId:
+                    type: string
+                  vendorName:
+                    type: string
+                  totalPaid:
+                    type: number
+                  months:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        month:
+                          type: string
+                          description: "YYYY-MM format"
+                        amount:
+                          type: number
+                      required: [month, amount]
+                required: [vendorId, vendorName, totalPaid, months]
 
   /vendors/{id}/liabilities:
     get:
@@ -1826,7 +1861,16 @@ components:
           enum: [low, medium, high, urgent]
         status:
           type: string
-          enum: [pending, approved, rejected, on_hold, partial, paid, overdue]
+          enum: [pending, approved, rejected, on_hold, partial, paid, overdue, withdrawn]
+        withdrawnAt:
+          type: string
+          nullable: true
+        withdrawnBy:
+          type: string
+          nullable: true
+        withdrawnByName:
+          type: string
+          nullable: true
         createdBy:
           type: string
         createdByName:

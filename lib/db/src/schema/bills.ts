@@ -17,7 +17,7 @@ export const billsTable = pgTable("bills", {
   walletName: text("wallet_name"),
   priority: text("priority", { enum: ["low", "medium", "high", "urgent"] }).notNull().default("medium"),
   status: text("status", {
-    enum: ["pending", "approved", "rejected", "on_hold", "partial", "paid", "overdue"],
+    enum: ["pending", "approved", "rejected", "on_hold", "partial", "paid", "overdue", "withdrawn"],
   }).notNull().default("pending"),
   createdBy: text("created_by").notNull(),
   createdByName: text("created_by_name").notNull(),
@@ -32,6 +32,10 @@ export const billsTable = pgTable("bills", {
   paidWalletName: text("paid_wallet_name"),
   notes: text("notes"),
   link: text("link"),
+  // Soft-delete / archive fields (set on withdraw or MD delete)
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  withdrawnBy: text("withdrawn_by"),
+  withdrawnByName: text("withdrawn_by_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
