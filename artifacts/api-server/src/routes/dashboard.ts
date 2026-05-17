@@ -175,9 +175,19 @@ router.get("/dashboard/activity", async (req, res): Promise<void> => {
 
 router.get("/dashboard/cashflow", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
-  const days = Math.min(Math.max(parseInt(String(req.query["days"] ?? "30")), 1), 90);
+  const rawDays = parseInt(String(req.query["days"] ?? "30"));
+  const days = Math.min(Math.max(isFinite(rawDays) ? rawDays : 30, 1), 90);
 
-  const cutoff = new Date(Date.now() - days * 86400000);
+  // Build zero-filled buckets first (i=days-1 oldest, i=0 today)
+  const buckets = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0]!;
+    buckets.set(d, 0);
+  }
+
+  // Use the oldest bucket's date as the exact cutoff so no rows are queried then silently dropped
+  const oldestKey = Array.from(buckets.keys())[0]!;
+  const cutoff = new Date(oldestKey + "T00:00:00.000Z");
 
   const conditions = [
     eq(billsTable.status, "paid"),
@@ -190,12 +200,6 @@ router.get("/dashboard/cashflow", async (req, res): Promise<void> => {
     .from(billsTable)
     .where(and(...conditions));
 
-  // Build a zero-filled bucket for each day in the window
-  const buckets = new Map<string, number>();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000).toISOString().split("T")[0]!;
-    buckets.set(d, 0);
-  }
   for (const bill of bills) {
     if (!bill.paidAt) continue;
     const d = (bill.paidAt as Date).toISOString().split("T")[0]!;
