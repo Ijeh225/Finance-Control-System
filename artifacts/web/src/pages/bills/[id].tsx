@@ -8,6 +8,7 @@ import {
   useApproveBill, useRejectBill, useHoldBill, usePartialApproveBill, useEscalateBill, useWithdrawBill, useDeleteBill,
   useAddBillComment,
   getListBillsQueryKey,
+  getListNotificationsQueryKey,
   useListBillAttachments, getListBillAttachmentsQueryKey,
   useRequestBillAttachmentUpload,
   useConfirmBillAttachment,
@@ -212,7 +213,12 @@ export default function BillDetail() {
 
   const addComment = useAddBillComment({
     mutation: {
-      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetBillCommentsQueryKey(id!) }); setComment(""); },
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetBillCommentsQueryKey(id!) });
+        qc.invalidateQueries({ queryKey: getGetBillAuditQueryKey(id!) });
+        qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ userId: user?.id ?? "" }) });
+        setComment("");
+      },
       onError: () => toast({ title: "Failed to add comment", variant: "destructive" }),
     },
   });
@@ -737,6 +743,11 @@ export default function BillDetail() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm uppercase tracking-wider font-semibold flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-primary" /> Comments
+              {!!commentsData?.comments?.length && (
+                <span className="ml-1 text-xs font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                  {commentsData.comments.length}
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -745,27 +756,54 @@ export default function BillDetail() {
                 {[1,2].map(i => <Skeleton key={i} className="h-16 w-full" />)}
               </div>
             ) : !commentsData?.comments?.length ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No comments yet.</p>
+              <p className="text-sm text-muted-foreground text-center py-6">No comments yet. Be the first to add one.</p>
             ) : (
-              <div className="space-y-3">
-                {commentsData.comments.map((c) => (
-                  <div key={c.id} className="p-3 bg-muted/40 rounded border border-border/50" data-testid={`comment-${c.id}`}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold">{c.authorName}</span>
-                      <span className="text-xs text-muted-foreground font-mono">{formatDateTime(c.createdAt)}</span>
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {commentsData.comments.map((c) => {
+                  const isOwn = c.authorId === user?.id;
+                  const isMdAuthor = c.authorRole === "md";
+                  return (
+                    <div
+                      key={c.id}
+                      className={`p-3 rounded border ${isOwn ? "bg-primary/5 border-primary/20" : "bg-muted/40 border-border/50"}`}
+                      data-testid={`comment-${c.id}`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-semibold truncate">{c.authorName}</span>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${isMdAuthor ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700"}`}>
+                            {isMdAuthor ? "MD" : "PA"}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-mono shrink-0">{formatDateTime(c.createdAt)}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed">{c.text}</p>
                     </div>
-                    <p className="text-sm">{c.text}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <Separator />
             <div className="space-y-2">
-              <Textarea placeholder="Add a comment..." value={comment} onChange={(e) => setComment(e.target.value)} rows={2} data-testid="input-comment" />
-              <Button size="sm" disabled={!comment.trim() || addComment.isPending || !user} onClick={() => addComment.mutate({ id: id!, data: { text: comment, authorId: user!.id } })} data-testid="button-submit-comment">
-                <Send className="w-3.5 h-3.5 mr-1.5" />
-                {addComment.isPending ? "Sending..." : "Send"}
-              </Button>
+              <Textarea
+                placeholder="Add a comment or progress update..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={2}
+                data-testid="input-comment"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && comment.trim() && !addComment.isPending && user) {
+                    addComment.mutate({ id: id!, data: { text: comment, authorId: user.id } });
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Ctrl+Enter to send</p>
+                <Button size="sm" disabled={!comment.trim() || addComment.isPending || !user} onClick={() => addComment.mutate({ id: id!, data: { text: comment, authorId: user!.id } })} data-testid="button-submit-comment">
+                  <Send className="w-3.5 h-3.5 mr-1.5" />
+                  {addComment.isPending ? "Sending..." : "Send"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

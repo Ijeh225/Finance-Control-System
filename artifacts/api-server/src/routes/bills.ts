@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -501,7 +501,9 @@ router.get("/bills/:id/comments", async (req, res): Promise<void> => {
   const { bill, forbidden } = await loadBill(rawId!, actor);
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
   if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
-  const comments = await db.select().from(commentsTable).where(eq(commentsTable.billId, rawId!));
+  const comments = await db.select().from(commentsTable)
+    .where(eq(commentsTable.billId, rawId!))
+    .orderBy(asc(commentsTable.createdAt));
   res.json({ comments });
 });
 
@@ -512,17 +514,34 @@ router.post("/bills/:id/comments", async (req, res): Promise<void> => {
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
   if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
   const { text } = req.body;
-  if (!text) { res.status(400).json({ error: "text is required" }); return; }
+  if (!text?.trim()) { res.status(400).json({ error: "text is required" }); return; }
   const [comment] = await db.insert(commentsTable).values({
     id: uid(), billId: rawId!, authorId: actor.id,
     authorName: actor.name,
     authorRole: actor.role,
-    text,
+    text: text.trim(),
   }).returning();
-  await addAudit(rawId!, actor.id, actor.name, "commented", text);
-  if (bill.createdBy !== actor.id) {
-    await notify(bill.createdBy, "comment_added", "New Comment", `${actor.name} commented on your bill: "${text.slice(0, 60)}"`, rawId!);
+  await addAudit(rawId!, actor.id, actor.name, "commented", text.trim());
+
+  // Notify the other party:
+  //   • PA commenting  → notify all MD users
+  //   • MD commenting  → notify the PA who created the bill
+  const snippet = `"${text.trim().slice(0, 60)}${text.trim().length > 60 ? "…" : ""}"`;
+  if (actor.id === bill.createdBy) {
+    // PA commenting — find all active MD users and notify them
+    const mds = await db.select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(eq(usersTable.role, "md"), eq(usersTable.isActive, true)));
+    await Promise.all(mds.map(md =>
+      notify(md.id, "comment_added", "New Comment on Bill",
+        `${actor.name} commented on a bill for ${bill.vendorName}: ${snippet}`, rawId!)
+    ));
+  } else {
+    // MD (or someone else) commenting — notify the PA who created the bill
+    await notify(bill.createdBy, "comment_added", "New Comment on Your Bill",
+      `${actor.name} commented on your bill for ${bill.vendorName}: ${snippet}`, rawId!);
   }
+
   res.status(201).json(comment);
 });
 
@@ -534,7 +553,9 @@ router.get("/bills/:id/audit", async (req, res): Promise<void> => {
   const { bill, forbidden } = await loadBill(rawId!, actor);
   if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
   if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
-  const entries = await db.select().from(auditTable).where(eq(auditTable.billId, rawId!));
+  const entries = await db.select().from(auditTable)
+    .where(eq(auditTable.billId, rawId!))
+    .orderBy(asc(auditTable.createdAt));
   res.json({ entries });
 });
 
