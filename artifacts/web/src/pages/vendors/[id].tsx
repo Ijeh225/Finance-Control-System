@@ -50,7 +50,7 @@ export default function VendorDetail() {
         setLocation("/vendors");
       },
       onError: (err: unknown) => {
-        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        const msg = (err as { data?: { error?: string } })?.data?.error;
         toast({ title: msg ?? "Failed to delete vendor", variant: "destructive" });
       },
     },

@@ -80,7 +80,7 @@ export default function Wallets() {
         toast({ title: "Transfer completed successfully" });
       },
       onError: (err: unknown) => {
-        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        const msg = (err as { data?: { error?: string } })?.data?.error;
         toast({ title: msg ?? "Transfer failed", variant: "destructive" });
       },
     },

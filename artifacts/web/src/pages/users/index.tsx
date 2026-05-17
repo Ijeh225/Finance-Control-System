@@ -68,7 +68,7 @@ export default function UsersList() {
         toast({ title: "User created" });
       },
       onError: (err: unknown) => {
-        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        const msg = (err as { data?: { error?: string } })?.data?.error;
         toast({ title: msg ?? "Failed to create user", variant: "destructive" });
       },
     },

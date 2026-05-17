@@ -205,7 +205,7 @@ export default function BillDetail() {
         toast({ title: "Payment processed successfully", description: "The bill has been marked paid and the transaction recorded." });
       },
       onError: (err: unknown) => {
-        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        const msg = (err as { data?: { error?: string } })?.data?.error;
         toast({ title: "Payment failed", description: msg ?? "Please check wallet balance and try again.", variant: "destructive" });
       },
     },
