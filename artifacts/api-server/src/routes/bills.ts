@@ -523,23 +523,29 @@ router.post("/bills/:id/comments", async (req, res): Promise<void> => {
   }).returning();
   await addAudit(rawId!, actor.id, actor.name, "commented", text.trim());
 
-  // Notify the other party:
-  //   • PA commenting  → notify all MD users
-  //   • MD commenting  → notify the PA who created the bill
+  // Notify the other party (role-based, never notify the actor themselves):
+  //   • MD commenting  → notify the PA who created the bill (skip if actor created it)
+  //   • non-MD commenting → notify all active MD users except the actor
   const snippet = `"${text.trim().slice(0, 60)}${text.trim().length > 60 ? "…" : ""}"`;
-  if (actor.id === bill.createdBy) {
-    // PA commenting — find all active MD users and notify them
+  if (actor.role === "md") {
+    // MD commenting — notify the PA creator if they are a different person
+    if (bill.createdBy !== actor.id) {
+      await notify(bill.createdBy, "comment_added", "New Comment on Your Bill",
+        `${actor.name} commented on your bill for ${bill.vendorName}: ${snippet}`, rawId!);
+    }
+  } else {
+    // PA (or other non-MD) commenting — notify all active MD users, skip self
     const mds = await db.select({ id: usersTable.id })
       .from(usersTable)
       .where(and(eq(usersTable.role, "md"), eq(usersTable.isActive, true)));
-    await Promise.all(mds.map(md =>
-      notify(md.id, "comment_added", "New Comment on Bill",
-        `${actor.name} commented on a bill for ${bill.vendorName}: ${snippet}`, rawId!)
-    ));
-  } else {
-    // MD (or someone else) commenting — notify the PA who created the bill
-    await notify(bill.createdBy, "comment_added", "New Comment on Your Bill",
-      `${actor.name} commented on your bill for ${bill.vendorName}: ${snippet}`, rawId!);
+    await Promise.all(
+      mds
+        .filter(md => md.id !== actor.id)
+        .map(md =>
+          notify(md.id, "comment_added", "New Comment on Bill",
+            `${actor.name} commented on a bill for ${bill.vendorName}: ${snippet}`, rawId!)
+        )
+    );
   }
 
   res.status(201).json(comment);
