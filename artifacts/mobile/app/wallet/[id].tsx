@@ -9,6 +9,7 @@ import {
   useGetWallet, getGetWalletQueryKey,
   useListWallets, getListWalletsQueryKey,
   useTransferFunds,
+  useUpdateWallet,
   getGetWalletStatementQueryKey,
 } from '@workspace/api-client-react';
 import type { WalletTransaction } from '@workspace/api-client-react';
@@ -64,6 +65,11 @@ export default function WalletDetailScreen() {
   const [pickingWallet, setPickingWallet] = useState<'from' | 'to' | null>(null);
   const [transferError, setTransferError] = useState('');
 
+  const [showFundWallet, setShowFundWallet] = useState(false);
+  const [fundAmount, setFundAmount] = useState('');
+  const [fundSource, setFundSource] = useState('');
+  const [fundError, setFundError] = useState('');
+
   const { data: wallet, isLoading } = useGetWallet(
     id as string,
     { query: { enabled: !!id, queryKey: getGetWalletQueryKey(id as string) } }
@@ -93,6 +99,44 @@ export default function WalletDetailScreen() {
       },
     },
   });
+
+  const fundMutation = useUpdateWallet({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetWalletQueryKey(id as string) });
+        qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
+        setShowFundWallet(false);
+        setFundAmount('');
+        setFundSource('');
+        setFundError('');
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        setFundError(msg ?? 'Could not add funds. Please try again.');
+      },
+    },
+  });
+
+  const openFundWallet = () => {
+    setFundAmount('');
+    setFundSource('');
+    setFundError('');
+    setShowFundWallet(true);
+  };
+
+  const handleFundWallet = () => {
+    setFundError('');
+    const amt = parseFloat(fundAmount);
+    if (!amt || amt <= 0) { setFundError('Enter a valid amount.'); return; }
+    if (!fundSource.trim()) { setFundError('Describe the source of these funds.'); return; }
+    fundMutation.mutate({
+      id: id as string,
+      data: {
+        balance: (wallet?.balance ?? 0) + amt,
+        narration: fundSource.trim(),
+      },
+    });
+  };
 
   const openTransfer = () => {
     setFromWalletId(id ?? '');
@@ -154,15 +198,26 @@ export default function WalletDetailScreen() {
               <Text style={[styles.accountNumber, { color: colors.primaryForeground }]}>
                 {wallet.accountNumber}
               </Text>
-              <Pressable
-                style={[styles.transferBtn, { backgroundColor: colors.primaryForeground + '22' }]}
-                onPress={openTransfer}
-              >
-                <Feather name="arrow-right-circle" size={16} color={colors.primaryForeground} />
-                <Text style={[styles.transferBtnText, { color: colors.primaryForeground }]}>
-                  Transfer Funds
-                </Text>
-              </Pressable>
+              <View style={styles.balanceActions}>
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: colors.primaryForeground + '22' }]}
+                  onPress={openFundWallet}
+                >
+                  <Feather name="trending-up" size={15} color={colors.primaryForeground} />
+                  <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+                    Fund Wallet
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.actionBtn, { backgroundColor: colors.primaryForeground + '22' }]}
+                  onPress={openTransfer}
+                >
+                  <Feather name="arrow-right-circle" size={15} color={colors.primaryForeground} />
+                  <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+                    Transfer Funds
+                  </Text>
+                </Pressable>
+              </View>
             </View>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
           </View>
@@ -271,6 +326,84 @@ export default function WalletDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* Fund Wallet Modal */}
+      <Modal visible={showFundWallet} animationType="slide" transparent onRequestClose={() => setShowFundWallet(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowFundWallet(false)}>
+          <Pressable onPress={e => e.stopPropagation()} style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <View style={[styles.sheetHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Fund Wallet</Text>
+                <Pressable onPress={() => setShowFundWallet(false)} hitSlop={12}>
+                  <Feather name="x" size={20} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+
+              <ScrollView style={{ maxHeight: 440 }} keyboardShouldPersistTaps="handled">
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>AMOUNT (₦) *</Text>
+                  <TextInput
+                    style={[styles.textInput, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="decimal-pad"
+                    value={fundAmount}
+                    onChangeText={setFundAmount}
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SOURCE OF FUNDS / DESCRIPTION *</Text>
+                  <TextInput
+                    style={[styles.textInput, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]}
+                    placeholder="e.g. Client payment received, office cash injection…"
+                    placeholderTextColor={colors.mutedForeground}
+                    value={fundSource}
+                    onChangeText={setFundSource}
+                  />
+                  <Text style={[styles.fieldHint, { color: colors.mutedForeground }]}>
+                    Describe where this money is coming from — it will appear in the ledger.
+                  </Text>
+                </View>
+
+                {wallet && fundAmount && parseFloat(fundAmount) > 0 && (
+                  <View style={[styles.balancePreview, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <View style={styles.balancePreviewRow}>
+                      <Text style={[styles.balancePreviewLabel, { color: colors.mutedForeground }]}>Current balance</Text>
+                      <Text style={[styles.balancePreviewValue, { color: colors.mutedForeground }]}>{formatAmt(wallet.balance ?? 0)}</Text>
+                    </View>
+                    <View style={styles.balancePreviewRow}>
+                      <Text style={[styles.balancePreviewLabel, { color: colors.foreground, fontWeight: '700' }]}>New balance</Text>
+                      <Text style={[styles.balancePreviewValue, { color: colors.primary, fontWeight: '700' }]}>
+                        {formatAmt((wallet.balance ?? 0) + parseFloat(fundAmount))}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {!!fundError && (
+                  <Text style={styles.errorText}>{fundError}</Text>
+                )}
+              </ScrollView>
+
+              <View style={[styles.sheetFooter, { borderTopColor: colors.border }]}>
+                <Pressable style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setShowFundWallet(false)}>
+                  <Text style={{ color: colors.foreground, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.confirmBtn, { backgroundColor: colors.primary, opacity: fundMutation.isPending ? 0.6 : 1 }]}
+                  onPress={handleFundWallet}
+                  disabled={fundMutation.isPending}
+                >
+                  <Text style={{ color: colors.primaryForeground, fontWeight: '700' }}>
+                    {fundMutation.isPending ? 'Adding Funds…' : 'Add Funds'}
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Wallet Picker Modal */}
       <Modal visible={!!pickingWallet} animationType="fade" transparent onRequestClose={() => setPickingWallet(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setPickingWallet(null)}>
@@ -310,12 +443,14 @@ const styles = StyleSheet.create({
   bankLabel: { fontSize: 14, fontWeight: '700', opacity: 0.8 },
   balanceAmount: { fontSize: 36, fontWeight: '800' },
   accountNumber: { fontSize: 16, fontWeight: '600', letterSpacing: 2, opacity: 0.9 },
-  transferBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10,
-    borderRadius: 20, marginTop: 4,
+  balanceActions: {
+    flexDirection: 'row', gap: 10, marginTop: 4,
   },
-  transferBtnText: { fontSize: 14, fontWeight: '700' },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 20,
+  },
+  actionBtnText: { fontSize: 13, fontWeight: '700' },
   sectionTitle: { fontSize: 20, fontWeight: '700' },
   listContent: { paddingBottom: 20 },
   emptyState: { alignItems: 'center', padding: 40 },
@@ -382,4 +517,14 @@ const styles = StyleSheet.create({
   },
   pickerOptionName: { fontSize: 15, fontWeight: '600', flex: 1 },
   pickerOptionBalance: { fontSize: 14, fontWeight: '500', fontVariant: ['tabular-nums'] },
+  fieldHint: { fontSize: 12, marginTop: 4, lineHeight: 16 },
+  balancePreview: {
+    marginHorizontal: 20, marginTop: 16,
+    borderWidth: 1, borderRadius: 12, padding: 14, gap: 8,
+  },
+  balancePreviewRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  balancePreviewLabel: { fontSize: 13 },
+  balancePreviewValue: { fontSize: 14, fontVariant: ['tabular-nums'] },
 });
