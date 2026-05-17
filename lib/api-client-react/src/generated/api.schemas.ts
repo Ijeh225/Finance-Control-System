@@ -604,6 +604,10 @@ export type ListVendors200 = {
   vendors: Vendor[];
 };
 
+export type DeleteVendor200 = {
+  success?: boolean;
+};
+
 export type ListWalletsParams = {
 userId?: string;
 };

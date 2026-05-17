@@ -53,6 +53,29 @@ router.get("/vendors/:id", async (req, res): Promise<void> => {
   res.json({ ...formatVendor(vendor as Record<string, unknown>), bills: bills.map(formatBill), recentActivity: activity });
 });
 
+router.delete("/vendors/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can delete vendors" }); return; }
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
+  if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
+
+  const activeBills = await db.select({ id: billsTable.id }).from(billsTable).where(
+    and(
+      eq(billsTable.vendorId, rawId!),
+      sql`${billsTable.status} NOT IN ('paid', 'rejected')`
+    )
+  );
+  if (activeBills.length > 0) {
+    res.status(409).json({ error: `Cannot delete vendor — ${activeBills.length} active bill(s) must be resolved first` });
+    return;
+  }
+
+  await db.delete(vendorsTable).where(eq(vendorsTable.id, rawId!));
+  req.log.info({ vendorId: rawId, actor: actor.id }, "Vendor deleted by MD");
+  res.json({ success: true });
+});
+
 router.get("/vendors/:id/liabilities", async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));

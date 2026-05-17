@@ -991,6 +991,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VendorDetail"
+    delete:
+      operationId: deleteVendor
+      tags: [vendors]
+      summary: Delete a vendor (MD only). Blocked if active bills exist.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
 
   /vendors/{id}/liabilities:
     get:

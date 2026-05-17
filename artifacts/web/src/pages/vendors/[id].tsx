@@ -3,7 +3,8 @@ import { useParams, useLocation } from "wouter";
 import {
   useGetVendor, getGetVendorQueryKey,
   useGetVendorLiabilities, getGetVendorLiabilitiesQueryKey,
-  useUpdateBill,
+  useUpdateBill, useDeleteVendor,
+  getListVendorsQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,9 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,6 +39,22 @@ export default function VendorDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const deleteVendor = useDeleteVendor({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+        toast({ title: "Vendor deleted" });
+        setLocation("/vendors");
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: msg ?? "Failed to delete vendor", variant: "destructive" });
+      },
+    },
+  });
 
   // Add Expense dialog state
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -156,6 +173,17 @@ export default function VendorDetail() {
                 <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Job
               </Button>
             </Link>
+          )}
+          {user?.role === "md" && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={deleteVendor.isPending}
+              data-testid="button-delete-vendor"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+            </Button>
           )}
           <a href={`/api/export/vendors/${id}/statement?format=excel`} download data-testid="button-export-vendor-excel">
             <Button size="sm" variant="outline" className="text-xs">
@@ -382,6 +410,31 @@ export default function VendorDetail() {
               <Button variant="outline" onClick={() => setShowAddExpense(false)}>Cancel</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Vendor Confirmation */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Delete Vendor?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently delete <strong>{vendor?.name}</strong>. Vendors with active bills (pending, approved, partial, on hold, or overdue) cannot be deleted — resolve those bills first.
+          </p>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteVendor.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteVendor.isPending}
+              data-testid="button-confirm-delete-vendor"
+              onClick={() => deleteVendor.mutate({ id: id! })}
+            >
+              {deleteVendor.isPending ? "Deleting…" : "Yes, Delete Vendor"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

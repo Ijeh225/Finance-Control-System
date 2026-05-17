@@ -35,6 +35,7 @@ import type {
   DeactivateUser200,
   DeleteBill200,
   DeleteBillAttachment200,
+  DeleteVendor200,
   EscalateBillBody,
   ExportReportParams,
   ExportVendorStatementParams,
@@ -3063,6 +3064,76 @@ export function useGetVendor<TData = Awaited<ReturnType<typeof getVendor>>, TErr
 
 
 
+
+export const getDeleteVendorUrl = (id: string,) => {
+
+
+
+
+  return `/api/vendors/${id}`
+}
+
+/**
+ * @summary Delete a vendor (MD only). Blocked if active bills exist.
+ */
+export const deleteVendor = async (id: string, options?: RequestInit): Promise<DeleteVendor200> => {
+
+  return customFetch<DeleteVendor200>(getDeleteVendorUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteVendorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteVendor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVendor>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteVendor(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVendorMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVendor>>>
+
+    export type DeleteVendorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a vendor (MD only). Blocked if active bills exist.
+ */
+export const useDeleteVendor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVendor>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVendor>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteVendorMutationOptions(options));
+    }
 
 export const getGetVendorLiabilitiesUrl = (id: string,) => {
 

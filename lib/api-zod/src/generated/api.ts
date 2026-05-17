@@ -1178,6 +1178,18 @@ export const GetVendorResponse = zod.object({
 
 
 /**
+ * @summary Delete a vendor (MD only). Blocked if active bills exist.
+ */
+export const DeleteVendorParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteVendorResponse = zod.object({
+  "success": zod.boolean().optional()
+})
+
+
+/**
  * @summary Get vendor liabilities with aging
  */
 export const GetVendorLiabilitiesParams = zod.object({
