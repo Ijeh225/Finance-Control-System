@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import {
   useGetVendor, getGetVendorQueryKey,
   useGetVendorLiabilities, getGetVendorLiabilitiesQueryKey,
-  useUpdateBill, useDeleteVendor,
+  useUpdateBill, useDeleteVendor, useUpdateVendor,
   getListVendorsQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus, Trash2, ExternalLink, Package, FileText, Link2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building2, Phone, Mail, Download, Plus, Trash2, ExternalLink, Package, FileText, Link2, Pencil } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { Link } from "wouter";
@@ -42,6 +42,24 @@ export default function VendorDetail() {
   const { toast } = useToast();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEditVendor, setShowEditVendor] = useState(false);
+  const emptyEditForm = () => ({ name: "", phone: "", email: "", bankName: "", accountNumber: "", containers: "", requestPurpose: "", relatedLink: "" });
+  const [editVendorForm, setEditVendorForm] = useState(emptyEditForm());
+
+  const updateVendor = useUpdateVendor({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetVendorQueryKey(id!) });
+        queryClient.invalidateQueries({ queryKey: getListVendorsQueryKey() });
+        setShowEditVendor(false);
+        toast({ title: "Vendor updated" });
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Failed to update vendor", variant: "destructive" });
+      },
+    },
+  });
 
   const deleteVendor = useDeleteVendor({
     mutation: {
@@ -204,6 +222,26 @@ export default function VendorDetail() {
               </Button>
             </Link>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="button-edit-vendor"
+            onClick={() => {
+              setEditVendorForm({
+                name: vendor.name ?? "",
+                phone: vendor.phone ?? "",
+                email: vendor.email ?? "",
+                bankName: vendor.bankName ?? "",
+                accountNumber: vendor.accountNumber ?? "",
+                containers: (vendor as any).containers ?? "",
+                requestPurpose: (vendor as any).requestPurpose ?? "",
+                relatedLink: (vendor as any).relatedLink ?? "",
+              });
+              setShowEditVendor(true);
+            }}
+          >
+            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+          </Button>
           {user?.role === "md" && (
             <Button
               size="sm"
@@ -461,6 +499,70 @@ export default function VendorDetail() {
               <Button variant="outline" onClick={() => setShowAddExpense(false)}>Cancel</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vendor Dialog */}
+      <Dialog open={showEditVendor} onOpenChange={setShowEditVendor}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Vendor — {vendor?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Vendor Name *</Label>
+                <Input value={editVendorForm.name} onChange={e => setEditVendorForm(f => ({ ...f, name: e.target.value }))} placeholder="Vendor or company name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Phone</Label>
+                <Input value={editVendorForm.phone} onChange={e => setEditVendorForm(f => ({ ...f, phone: e.target.value }))} placeholder="+234 …" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Email</Label>
+                <Input type="email" value={editVendorForm.email} onChange={e => setEditVendorForm(f => ({ ...f, email: e.target.value }))} placeholder="vendor@example.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Bank Name</Label>
+                <Input value={editVendorForm.bankName} onChange={e => setEditVendorForm(f => ({ ...f, bankName: e.target.value }))} placeholder="GTBank, Access, etc." />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Account Number</Label>
+                <Input value={editVendorForm.accountNumber} onChange={e => setEditVendorForm(f => ({ ...f, accountNumber: e.target.value }))} placeholder="0123456789" className="font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Containers</Label>
+                <Input value={editVendorForm.containers} onChange={e => setEditVendorForm(f => ({ ...f, containers: e.target.value }))} placeholder="e.g. 3×40ft" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Request Purpose</Label>
+                <Input value={editVendorForm.requestPurpose} onChange={e => setEditVendorForm(f => ({ ...f, requestPurpose: e.target.value }))} placeholder="e.g. Port clearance" />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Related Link</Label>
+                <Input type="url" value={editVendorForm.relatedLink} onChange={e => setEditVendorForm(f => ({ ...f, relatedLink: e.target.value }))} placeholder="https://…" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setShowEditVendor(false)} disabled={updateVendor.isPending}>Cancel</Button>
+            <Button
+              disabled={!editVendorForm.name || updateVendor.isPending}
+              data-testid="button-confirm-edit-vendor"
+              onClick={() => updateVendor.mutate({ id: id!, data: {
+                name: editVendorForm.name,
+                phone: editVendorForm.phone || undefined,
+                email: editVendorForm.email || undefined,
+                bankName: editVendorForm.bankName || undefined,
+                accountNumber: editVendorForm.accountNumber || undefined,
+                containers: editVendorForm.containers || undefined,
+                requestPurpose: editVendorForm.requestPurpose || undefined,
+                relatedLink: editVendorForm.relatedLink || undefined,
+              }})}
+            >
+              {updateVendor.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

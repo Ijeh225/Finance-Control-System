@@ -20,6 +20,7 @@ import {
   useRescheduleBill,
   getGetScheduledTodayQueryKey,
   getGetScheduledTomorrowQueryKey,
+  useGetBillPayments, getGetBillPaymentsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
@@ -311,6 +312,13 @@ export default function BillDetail() {
   // Derived amounts — must be computed before permission flags
   const approvedAmt = bill.approvedAmount ?? bill.amount ?? 0;
   const alreadyPaid = bill.paidAmount ?? 0;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const { data: billPaymentsData } = useGetBillPayments(id!, {
+    query: {
+      queryKey: getGetBillPaymentsQueryKey(id!),
+      enabled: Number(alreadyPaid) > 0,
+    },
+  });
   const remainingApproved = Math.max(0, Number(approvedAmt) - Number(alreadyPaid));
   const totalOutstanding = Number(bill.outstandingBalance ?? 0);
   // True when partial payment was processed but no more approved funds remain — waiting for MD to approve next tranche
@@ -570,6 +578,39 @@ export default function BillDetail() {
                 <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Reference</p>
                 <p className="font-mono text-xs tracking-wide">{bill.paymentReference ?? "—"}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Partial Payment History — shown whenever any payment has been made */}
+      {billPaymentsData?.payments && billPaymentsData.payments.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+              <CreditCard className="w-4 h-4" /> Payment History ({billPaymentsData.payments.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y">
+              {billPaymentsData.payments.map((pmt, i) => (
+                <div key={pmt.id} className="px-6 py-3 flex items-center justify-between text-sm">
+                  <div className="space-y-0.5">
+                    <p className="font-semibold font-mono text-teal-700">{formatCurrency(pmt.amount ?? 0)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(pmt.createdAt ?? "")} · {pmt.initiatedByName ?? "—"}</p>
+                    {pmt.narration && (
+                      <p className="text-xs text-muted-foreground/70 italic">{pmt.narration}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xs text-muted-foreground">Payment {i + 1}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-3 border-t bg-muted/20 flex justify-between text-sm font-semibold">
+              <span>Total Paid</span>
+              <span className="font-mono text-teal-700">{formatCurrency(bill.paidAmount ?? 0)}</span>
             </div>
           </CardContent>
         </Card>

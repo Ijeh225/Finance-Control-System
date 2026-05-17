@@ -56,6 +56,31 @@ router.get("/vendors/:id", async (req, res): Promise<void> => {
   res.json({ ...formatVendor(vendor as Record<string, unknown>), bills: bills.map(formatBill), recentActivity: activity });
 });
 
+router.patch("/vendors/:id", async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const [existing] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
+  if (!existing) { res.status(404).json({ error: "Vendor not found" }); return; }
+
+  const { name, phone, email, bankName, accountNumber, containers, requestPurpose, relatedLink } = req.body;
+  const updates: Record<string, unknown> = {};
+  if (name !== undefined) updates["name"] = name;
+  if (phone !== undefined) updates["phone"] = phone || null;
+  if (email !== undefined) updates["email"] = email || null;
+  if (bankName !== undefined) updates["bankName"] = bankName || null;
+  if (accountNumber !== undefined) updates["accountNumber"] = accountNumber || null;
+  if (containers !== undefined) updates["containers"] = containers || null;
+  if (requestPurpose !== undefined) updates["requestPurpose"] = requestPurpose || null;
+  if (relatedLink !== undefined) updates["relatedLink"] = relatedLink || null;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" }); return;
+  }
+
+  const [vendor] = await db.update(vendorsTable).set(updates).where(eq(vendorsTable.id, rawId!)).returning();
+  req.log.info({ vendorId: rawId, actor: req.user!.id }, "Vendor updated");
+  res.json(formatVendor(vendor as Record<string, unknown>));
+});
+
 router.delete("/vendors/:id", async (req, res): Promise<void> => {
   const actor = req.user!;
   if (actor.role !== "md") { res.status(403).json({ error: "Only the MD can delete vendors" }); return; }

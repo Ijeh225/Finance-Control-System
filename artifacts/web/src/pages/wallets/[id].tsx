@@ -4,7 +4,7 @@ import {
   useGetWallet, getGetWalletQueryKey,
   useGetWalletStatement, getGetWalletStatementQueryKey,
   useListWallets, getListWalletsQueryKey,
-  useTransferFunds,
+  useTransferFunds, useUpdateWallet,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ArrowRightLeft, AlertTriangle,
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
-  Building2, Hash, Download, Receipt,
+  Building2, Hash, Download, Receipt, TrendingUp, Search, X,
 } from "lucide-react";
 
 const LARGE_TRANSFER_THRESHOLD = 500_000;
@@ -56,15 +56,50 @@ export default function WalletDetail() {
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [transferForm, setTransferForm] = useState({ fromWalletId: id ?? "", toWalletId: "", amount: "", narration: "" });
 
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [topUpNarration, setTopUpNarration] = useState("");
+
+  const [txType, setTxType] = useState<string>("");
+  const [txFrom, setTxFrom] = useState("");
+  const [txTo, setTxTo] = useState("");
+  const [txSearch, setTxSearch] = useState("");
+
   const { data: walletData, isLoading: isWalletLoading } = useGetWallet(id!, {
     query: { queryKey: getGetWalletQueryKey(id!) },
   });
 
+  const stmtParams = {
+    page,
+    pageSize,
+    ...(txType ? { type: txType as "credit" } : {}),
+    ...(txFrom ? { from: txFrom } : {}),
+    ...(txTo ? { to: txTo } : {}),
+    ...(txSearch ? { search: txSearch } : {}),
+  };
+
   const { data: statement, isLoading: isStatementLoading } = useGetWalletStatement(
     id!,
-    { page, pageSize },
-    { query: { queryKey: getGetWalletStatementQueryKey(id!, { page, pageSize }) } },
+    stmtParams,
+    { query: { queryKey: getGetWalletStatementQueryKey(id!, stmtParams) } },
   );
+
+  const topUp = useUpdateWallet({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetWalletQueryKey(id!) });
+        qc.invalidateQueries({ queryKey: getGetWalletStatementQueryKey(id!, stmtParams) });
+        setShowTopUp(false);
+        setTopUpAmount("");
+        setTopUpNarration("");
+        toast({ title: "Funds added to wallet" });
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Top-up failed", variant: "destructive" });
+      },
+    },
+  });
 
   const { data: walletsData } = useListWallets(undefined, {
     query: { queryKey: getListWalletsQueryKey() },
@@ -175,6 +210,12 @@ export default function WalletDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => { setTopUpAmount(""); setTopUpNarration(""); setShowTopUp(true); }}
+          >
+            <TrendingUp className="w-4 h-4 mr-2" /> Top Up
+          </Button>
           <Button onClick={() => { setTransferForm(f => ({ ...f, fromWalletId: id ?? "" })); setShowTransfer(true); }}>
             <ArrowRightLeft className="w-4 h-4 mr-2" /> Transfer Funds
           </Button>
@@ -205,6 +246,54 @@ export default function WalletDetail() {
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="font-bold text-lg">Transaction Statement</h2>
           <span className="text-sm text-muted-foreground">{total} transaction{total !== 1 ? "s" : ""}</span>
+        </div>
+
+        {/* Filters */}
+        <div className="px-6 py-3 border-b bg-muted/20 flex flex-wrap gap-2 items-center">
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              className="w-full h-8 rounded-md border bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              placeholder="Search narration…"
+              value={txSearch}
+              onChange={e => { setTxSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+          <Select value={txType || "all"} onValueChange={v => { setTxType(v === "all" ? "" : v); setPage(1); }}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="credit">Credit</SelectItem>
+              <SelectItem value="debit">Debit</SelectItem>
+              <SelectItem value="transfer_in">Transfer In</SelectItem>
+              <SelectItem value="transfer_out">Transfer Out</SelectItem>
+              <SelectItem value="bill_payment">Bill Payment</SelectItem>
+            </SelectContent>
+          </Select>
+          <input
+            type="date"
+            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            value={txFrom}
+            onChange={e => { setTxFrom(e.target.value); setPage(1); }}
+            title="From date"
+          />
+          <input
+            type="date"
+            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            value={txTo}
+            onChange={e => { setTxTo(e.target.value); setPage(1); }}
+            title="To date"
+          />
+          {(txType || txFrom || txTo || txSearch) && (
+            <button
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => { setTxType(""); setTxFrom(""); setTxTo(""); setTxSearch(""); setPage(1); }}
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
+          )}
         </div>
 
         {isStatementLoading ? (
@@ -414,6 +503,61 @@ export default function WalletDetail() {
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Top Up Dialog */}
+      <Dialog open={showTopUp} onOpenChange={setShowTopUp}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Top Up — {wallet?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Amount (NGN) *</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                className="font-mono"
+                value={topUpAmount}
+                onChange={e => setTopUpAmount(e.target.value)}
+                data-testid="input-topup-amount"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Narration</Label>
+              <Input
+                placeholder="e.g. Monthly fund injection"
+                value={topUpNarration}
+                onChange={e => setTopUpNarration(e.target.value)}
+                data-testid="input-topup-narration"
+              />
+            </div>
+            {wallet && topUpAmount && Number(topUpAmount) > 0 && (
+              <div className="rounded-md bg-muted/40 border px-3 py-2 text-sm space-y-1">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Current balance</span>
+                  <span className="font-mono">{formatCurrency(wallet.balance ?? 0)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-emerald-700">
+                  <span>New balance</span>
+                  <span className="font-mono">{formatCurrency((wallet.balance ?? 0) + Number(topUpAmount))}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 mt-1">
+            <Button variant="outline" onClick={() => setShowTopUp(false)} disabled={topUp.isPending}>Cancel</Button>
+            <Button
+              disabled={!topUpAmount || Number(topUpAmount) <= 0 || topUp.isPending}
+              data-testid="button-confirm-topup"
+              onClick={() => topUp.mutate({ id: id!, data: {
+                balance: (wallet?.balance ?? 0) + Number(topUpAmount),
+                narration: topUpNarration || undefined,
+              }})}
+            >
+              {topUp.isPending ? "Adding…" : "Add Funds"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

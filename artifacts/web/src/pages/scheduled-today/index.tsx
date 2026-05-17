@@ -1,10 +1,16 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
-import { useGetScheduledToday, getGetScheduledTodayQueryKey } from "@workspace/api-client-react";
+import {
+  useGetScheduledToday, getGetScheduledTodayQueryKey,
+  useWithdrawBill, getListBillsQueryKey,
+} from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarClock, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CalendarClock, ChevronLeft, ChevronRight, CheckCircle2, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: "bg-slate-100 text-slate-600",
@@ -22,11 +28,29 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function ScheduledToday() {
   const { user } = useAuth();
-  const userId = user?.role !== "md" ? user?.id : undefined;
+  const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const isPA = user?.role !== "md";
+  const userId = isPA ? user?.id : undefined;
   const params = userId ? { userId } : undefined;
 
   const { data, isLoading } = useGetScheduledToday(params, {
     query: { queryKey: getGetScheduledTodayQueryKey(params) },
+  });
+
+  const withdraw = useWithdrawBill({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetScheduledTodayQueryKey(params) });
+        qc.invalidateQueries({ queryKey: getListBillsQueryKey() });
+        toast({ title: "Bill removed from schedule" });
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Failed to remove bill", variant: "destructive" });
+      },
+    },
   });
 
   return (
@@ -67,24 +91,44 @@ export default function ScheduledToday() {
             </div>
           ) : (
             <div className="divide-y">
-              {data.bills.map(bill => (
-                <Link key={bill.id} href={`/bills/${bill.id}`}>
-                  <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group" data-testid={`row-today-${bill.id}`}>
+              {data.bills.map(bill => {
+                const canRemove = isPA && bill.status === "pending" && bill.createdBy === user?.id;
+                return (
+                  <div
+                    key={bill.id}
+                    className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors cursor-pointer group"
+                    data-testid={`row-today-${bill.id}`}
+                    onClick={() => navigate(`/bills/${bill.id}`)}
+                  >
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold group-hover:text-primary transition-colors">{bill.vendorName}</span>
                         <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${PRIORITY_COLORS[bill.priority ?? "low"]}`}>{bill.priority}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{bill.description}</p>
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">{formatDate(bill.scheduledDate ?? "")}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLORS[bill.status ?? "pending"] ?? "bg-muted text-muted-foreground border-border"}`}>{bill.status?.replace("_", " ")}</span>
                       <p className="font-bold font-mono">{formatCurrency(bill.amount ?? 0)}</p>
+                      {canRemove && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700 hover:bg-rose-50 shrink-0"
+                          title="Remove from schedule"
+                          data-testid={`button-remove-today-${bill.id}`}
+                          disabled={withdraw.isPending}
+                          onClick={e => { e.stopPropagation(); withdraw.mutate({ id: bill.id }); }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                       <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                     </div>
                   </div>
-                </Link>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

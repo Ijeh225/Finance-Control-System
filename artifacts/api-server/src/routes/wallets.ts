@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, gte, lte, ilike } from "drizzle-orm";
 import { db, walletsTable, usersTable, walletTransactionsTable, auditTable, notificationsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -287,14 +287,30 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
   const page = Math.max(1, parseInt(String(req.query["page"] ?? "1")) || 1);
   const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query["pageSize"] ?? "50")) || 50));
   const offset = (page - 1) * pageSize;
+  const typeFilter = req.query["type"] as string | undefined;
+  const fromFilter = req.query["from"] as string | undefined;
+  const toFilter = req.query["to"] as string | undefined;
+  const searchFilter = req.query["search"] as string | undefined;
+
+  const filterConditions: ReturnType<typeof eq>[] = [eq(walletTransactionsTable.walletId, id)];
+  if (typeFilter) filterConditions.push(eq(walletTransactionsTable.type, typeFilter as "credit"));
+  if (fromFilter) filterConditions.push(gte(walletTransactionsTable.createdAt, new Date(fromFilter)));
+  if (toFilter) {
+    const toDate = new Date(toFilter);
+    toDate.setHours(23, 59, 59, 999);
+    filterConditions.push(lte(walletTransactionsTable.createdAt, toDate));
+  }
+  if (searchFilter) filterConditions.push(ilike(walletTransactionsTable.narration, `%${searchFilter}%`));
+
+  const whereClause = and(...filterConditions);
 
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(walletTransactionsTable)
-    .where(eq(walletTransactionsTable.walletId, id));
+    .where(whereClause);
 
   const transactions = await db.select().from(walletTransactionsTable)
-    .where(eq(walletTransactionsTable.walletId, id))
+    .where(whereClause)
     .orderBy(desc(walletTransactionsTable.createdAt))
     .limit(pageSize)
     .offset(offset);
@@ -318,7 +334,7 @@ router.get("/wallets/:id/statement", async (req, res): Promise<void> => {
 router.patch("/wallets/:id", async (req, res): Promise<void> => {
   const actor = req.user!;
   const id = req.params["id"] as string;
-  const { balance, name, bankName, accountNumber, currency, ownedBy, lowBalanceThreshold } = req.body;
+  const { balance, name, bankName, accountNumber, currency, ownedBy, lowBalanceThreshold, narration } = req.body;
 
   const [existing] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Wallet not found" }); return; }
@@ -358,7 +374,7 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
         amount: String(Math.abs(diff)),
         balanceBefore: String(prevBalance),
         balanceAfter: String(newBalance),
-        narration: "Manual balance adjustment",
+        narration: narration || (diff > 0 ? "Top-up / funds received" : "Manual balance adjustment"),
         initiatedBy: actor.id,
         initiatedByName: actor.name,
         relatedWalletId: null,

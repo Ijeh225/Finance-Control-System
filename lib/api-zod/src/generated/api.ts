@@ -1079,6 +1079,29 @@ export const DownloadBillAttachmentParams = zod.object({
 
 
 /**
+ * @summary Get individual payment events for a bill
+ */
+export const GetBillPaymentsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBillPaymentsResponse = zod.object({
+  "payments": zod.array(zod.object({
+  "id": zod.string(),
+  "walletId": zod.string(),
+  "amount": zod.number(),
+  "balanceBefore": zod.number(),
+  "balanceAfter": zod.number(),
+  "narration": zod.string(),
+  "initiatedBy": zod.string(),
+  "initiatedByName": zod.string(),
+  "relatedBillId": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
  * @summary Get comments for a bill
  */
 export const GetBillCommentsParams = zod.object({
@@ -1245,6 +1268,42 @@ export const GetVendorResponse = zod.object({
 
 
 /**
+ * @summary Update vendor details
+ */
+export const UpdateVendorParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateVendorBody = zod.object({
+  "name": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "containers": zod.string().optional(),
+  "requestPurpose": zod.string().optional(),
+  "relatedLink": zod.string().optional()
+})
+
+export const UpdateVendorResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "bankName": zod.string().optional(),
+  "accountNumber": zod.string().optional(),
+  "totalBilled": zod.number(),
+  "totalPaid": zod.number(),
+  "outstandingBalance": zod.number(),
+  "lastPaymentDate": zod.string().optional(),
+  "containers": zod.string().nullish(),
+  "requestPurpose": zod.string().nullish(),
+  "relatedLink": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Delete a vendor (MD only). Blocked if active bills exist.
  */
 export const DeleteVendorParams = zod.object({
@@ -1359,7 +1418,8 @@ export const UpdateWalletParams = zod.object({
 
 export const UpdateWalletBody = zod.object({
   "balance": zod.number().optional(),
-  "name": zod.string().optional()
+  "name": zod.string().optional(),
+  "narration": zod.string().optional().describe('Optional custom narration for the ledger entry when balance changes')
 })
 
 export const UpdateWalletResponse = zod.object({
@@ -1459,7 +1519,11 @@ export const getWalletStatementQueryPageSizeDefault = 50;
 
 export const GetWalletStatementQueryParams = zod.object({
   "page": zod.coerce.number().default(getWalletStatementQueryPageDefault),
-  "pageSize": zod.coerce.number().default(getWalletStatementQueryPageSizeDefault)
+  "pageSize": zod.coerce.number().default(getWalletStatementQueryPageSizeDefault),
+  "type": zod.enum(['credit', 'debit', 'transfer_in', 'transfer_out', 'bill_payment']).optional(),
+  "from": zod.coerce.string().optional(),
+  "to": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional()
 })
 
 export const GetWalletStatementResponse = zod.object({

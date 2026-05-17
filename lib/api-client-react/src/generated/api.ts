@@ -43,6 +43,7 @@ import type {
   ExportWalletStatementParams,
   GetBillAudit200,
   GetBillComments200,
+  GetBillPayments200,
   GetDashboardCashflow200,
   GetDashboardCashflowParams,
   GetDashboardSummaryParams,
@@ -94,6 +95,7 @@ import type {
   TransferInput,
   UpdateBillInput,
   UpdateUserInput,
+  UpdateVendorInput,
   UpdateWalletBody,
   UploadBillAttachmentBody,
   User,
@@ -2694,6 +2696,83 @@ export function useDownloadBillAttachment<TData = Awaited<ReturnType<typeof down
 
 
 
+export const getGetBillPaymentsUrl = (id: string,) => {
+
+
+
+
+  return `/api/bills/${id}/payments`
+}
+
+/**
+ * @summary Get individual payment events for a bill
+ */
+export const getBillPayments = async (id: string, options?: RequestInit): Promise<GetBillPayments200> => {
+
+  return customFetch<GetBillPayments200>(getGetBillPaymentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBillPaymentsQueryKey = (id: string,) => {
+    return [
+    `/api/bills/${id}/payments`
+    ] as const;
+    }
+
+
+export const getGetBillPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof getBillPayments>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBillPaymentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBillPayments>>> = ({ signal }) => getBillPayments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBillPayments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBillPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof getBillPayments>>>
+export type GetBillPaymentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get individual payment events for a bill
+ */
+
+export function useGetBillPayments<TData = Awaited<ReturnType<typeof getBillPayments>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillPayments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBillPaymentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetBillCommentsUrl = (id: string,) => {
 
 
@@ -3151,6 +3230,78 @@ export function useGetVendor<TData = Awaited<ReturnType<typeof getVendor>>, TErr
 
 
 
+
+export const getUpdateVendorUrl = (id: string,) => {
+
+
+
+
+  return `/api/vendors/${id}`
+}
+
+/**
+ * @summary Update vendor details
+ */
+export const updateVendor = async (id: string,
+    updateVendorInput: UpdateVendorInput, options?: RequestInit): Promise<Vendor> => {
+
+  return customFetch<Vendor>(getUpdateVendorUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateVendorInput,)
+  }
+);}
+
+
+
+
+export const getUpdateVendorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{id: string;data: BodyType<UpdateVendorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{id: string;data: BodyType<UpdateVendorInput>}, TContext> => {
+
+const mutationKey = ['updateVendor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVendor>>, {id: string;data: BodyType<UpdateVendorInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateVendor(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVendorMutationResult = NonNullable<Awaited<ReturnType<typeof updateVendor>>>
+    export type UpdateVendorMutationBody = BodyType<UpdateVendorInput>
+    export type UpdateVendorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update vendor details
+ */
+export const useUpdateVendor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVendor>>, TError,{id: string;data: BodyType<UpdateVendorInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVendor>>,
+        TError,
+        {id: string;data: BodyType<UpdateVendorInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVendorMutationOptions(options));
+    }
 
 export const getDeleteVendorUrl = (id: string,) => {
 

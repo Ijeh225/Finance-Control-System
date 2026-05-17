@@ -48,13 +48,43 @@ async function loadBill(billId: string, actor: Actor) {
 // Flips any pending bill whose scheduledDate is in the past to "overdue".
 // Called before every list/dashboard fetch so the status is always current.
 async function markOverdueBills(userId?: string): Promise<void> {
-  const t = new Date().toISOString().split("T")[0]!;
-  const conditions: ReturnType<typeof eq>[] = [
+  const now = new Date();
+  const today = now.toISOString().split("T")[0]!;
+  // Tomorrow's date string
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = tomorrowDate.toISOString().split("T")[0]!;
+  // Yesterday's date string — bills from exactly yesterday get one free reschedule to tomorrow
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = yesterdayDate.toISOString().split("T")[0]!;
+
+  const baseConditions = (scheduledDate: string) => {
+    const conds: ReturnType<typeof eq>[] = [
+      eq(billsTable.status, "pending"),
+      eq(billsTable.scheduledDate, scheduledDate),
+    ];
+    if (userId) conds.push(eq(billsTable.createdBy, userId));
+    return conds;
+  };
+
+  // Bills scheduled for yesterday get auto-rescheduled to tomorrow (one free bump)
+  await db.update(billsTable)
+    .set({ scheduledDate: tomorrow })
+    .where(and(...baseConditions(yesterday)));
+
+  // Bills scheduled for today also get bumped to tomorrow (still "today" but missed)
+  await db.update(billsTable)
+    .set({ scheduledDate: tomorrow })
+    .where(and(...baseConditions(today)));
+
+  // Bills scheduled for 2+ days ago become overdue
+  const oldConditions: ReturnType<typeof eq>[] = [
     eq(billsTable.status, "pending"),
-    lt(billsTable.scheduledDate, t),
+    lt(billsTable.scheduledDate, yesterday),
   ];
-  if (userId) conditions.push(eq(billsTable.createdBy, userId));
-  await db.update(billsTable).set({ status: "overdue" }).where(and(...conditions));
+  if (userId) oldConditions.push(eq(billsTable.createdBy, userId));
+  await db.update(billsTable).set({ status: "overdue" }).where(and(...oldConditions));
 }
 
 router.get("/bills", async (req, res): Promise<void> => {
@@ -514,6 +544,32 @@ router.post("/bills/:id/withdraw", async (req, res): Promise<void> => {
   await db.delete(billsTable).where(eq(billsTable.id, rawId!));
   req.log.info({ billId: rawId, actor: actor.id }, "Bill withdrawn");
   res.json({ success: true });
+});
+
+// ─── Payment History ─────────────────────────────────────────────────────────
+
+router.get("/bills/:id/payments", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
+  const { bill, forbidden } = await loadBill(rawId!, actor);
+  if (!bill) { res.status(404).json({ error: "Bill not found" }); return; }
+  if (forbidden) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const payments = await db.select().from(walletTransactionsTable)
+    .where(and(
+      eq(walletTransactionsTable.relatedBillId, rawId!),
+      eq(walletTransactionsTable.type, "bill_payment"),
+    ))
+    .orderBy(asc(walletTransactionsTable.createdAt));
+
+  res.json({
+    payments: payments.map(p => ({
+      ...p,
+      amount: parseFloat(String(p.amount)),
+      balanceBefore: parseFloat(String(p.balanceBefore)),
+      balanceAfter: parseFloat(String(p.balanceAfter)),
+    })),
+  });
 });
 
 // ─── Comments ─────────────────────────────────────────────────────────────────

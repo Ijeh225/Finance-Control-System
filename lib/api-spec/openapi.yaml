@@ -891,6 +891,31 @@ paths:
                 type: string
                 format: binary
 
+  /bills/{id}/payments:
+    get:
+      operationId: getBillPayments
+      tags: [bills]
+      summary: Get individual payment events for a bill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BillPayment"
+                required: [payments]
+
   /bills/{id}/comments:
     get:
       operationId: getBillComments
@@ -1030,6 +1055,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VendorDetail"
+    patch:
+      operationId: updateVendor
+      tags: [vendors]
+      summary: Update vendor details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorInput"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
     delete:
       operationId: deleteVendor
       tags: [vendors]
@@ -1151,6 +1199,9 @@ paths:
                   type: number
                 name:
                   type: string
+                narration:
+                  type: string
+                  description: Optional custom narration for the ledger entry when balance changes
       responses:
         "200":
           description: Updated wallet
@@ -1209,6 +1260,26 @@ paths:
           schema:
             type: integer
             default: 50
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [credit, debit, transfer_in, transfer_out, bill_payment]
+        - name: from
+          in: query
+          schema:
+            type: string
+            description: ISO date string (inclusive)
+        - name: to
+          in: query
+          schema:
+            type: string
+            description: ISO date string (inclusive)
+        - name: search
+          in: query
+          schema:
+            type: string
+            description: Search narration text
       responses:
         "200":
           description: Wallet statement with transaction history
@@ -1953,6 +2024,52 @@ components:
         relatedLink:
           type: string
       required: [name]
+
+    UpdateVendorInput:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        bankName:
+          type: string
+        accountNumber:
+          type: string
+        containers:
+          type: string
+        requestPurpose:
+          type: string
+        relatedLink:
+          type: string
+
+    BillPayment:
+      type: object
+      properties:
+        id:
+          type: string
+        walletId:
+          type: string
+        amount:
+          type: number
+        balanceBefore:
+          type: number
+        balanceAfter:
+          type: number
+        narration:
+          type: string
+        initiatedBy:
+          type: string
+        initiatedByName:
+          type: string
+        relatedBillId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, walletId, amount, balanceBefore, balanceAfter, narration, initiatedBy, initiatedByName, createdAt]
 
     LiabilityAging:
       type: object

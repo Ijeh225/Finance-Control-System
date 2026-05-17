@@ -271,6 +271,30 @@ export interface CreateVendorInput {
   relatedLink?: string;
 }
 
+export interface UpdateVendorInput {
+  name?: string;
+  phone?: string;
+  email?: string;
+  bankName?: string;
+  accountNumber?: string;
+  containers?: string;
+  requestPurpose?: string;
+  relatedLink?: string;
+}
+
+export interface BillPayment {
+  id: string;
+  walletId: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  narration: string;
+  initiatedBy: string;
+  initiatedByName: string;
+  relatedBillId?: string | null;
+  createdAt: string;
+}
+
 export interface LiabilityAging {
   vendorId: string;
   vendorName: string;
@@ -616,6 +640,10 @@ export type DeleteBillAttachment200 = {
   ok: boolean;
 };
 
+export type GetBillPayments200 = {
+  payments: BillPayment[];
+};
+
 export type GetBillComments200 = {
   comments: Comment[];
 };
@@ -652,6 +680,8 @@ export type ListWallets200 = {
 export type UpdateWalletBody = {
   balance?: number;
   name?: string;
+  /** Optional custom narration for the ledger entry when balance changes */
+  narration?: string;
 };
 
 export type TransferFunds200 = {
@@ -664,7 +694,31 @@ export type TransferFunds200 = {
 export type GetWalletStatementParams = {
 page?: number;
 pageSize?: number;
+type?: GetWalletStatementType;
+/**
+ * ISO date string (inclusive)
+ */
+from?: string;
+/**
+ * ISO date string (inclusive)
+ */
+to?: string;
+/**
+ * Search narration text
+ */
+search?: string;
 };
+
+export type GetWalletStatementType = typeof GetWalletStatementType[keyof typeof GetWalletStatementType];
+
+
+export const GetWalletStatementType = {
+  credit: 'credit',
+  debit: 'debit',
+  transfer_in: 'transfer_in',
+  transfer_out: 'transfer_out',
+  bill_payment: 'bill_payment',
+} as const;
 
 export type ListNotificationsParams = {
 userId: string;
