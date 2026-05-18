@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   useListUsers, getListUsersQueryKey,
   useCreateUser, useUpdateUser, useDeactivateUser,
+  usePermanentDeleteUser, useResetUserPassword,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +25,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ChevronRight, UserX, Pencil, ShieldAlert, User as UserIcon } from "lucide-react";
+import { Plus, ChevronRight, UserX, Pencil, ShieldAlert, User as UserIcon, Trash2, KeyRound } from "lucide-react";
 import type { User, CreateUserInputRole, UpdateUserInput } from "@workspace/api-client-react";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -53,16 +54,21 @@ export default function UsersList() {
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<User | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<User | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
   const [form, setForm] = useState<FormState>(emptyForm());
   const [editForm, setEditForm] = useState<Partial<FormState>>({});
 
   const { data, isLoading } = useListUsers();
   const users = data?.users ?? [];
 
+  const invalidateUsers = () => qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+
   const createUser = useCreateUser({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+        invalidateUsers();
         setShowCreate(false);
         setForm(emptyForm());
         toast({ title: "User created" });
@@ -77,7 +83,7 @@ export default function UsersList() {
   const updateUser = useUpdateUser({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+        invalidateUsers();
         setEditTarget(null);
         toast({ title: "User updated" });
       },
@@ -88,11 +94,37 @@ export default function UsersList() {
   const deactivateUser = useDeactivateUser({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: getListUsersQueryKey() });
+        invalidateUsers();
         setDeactivateTarget(null);
         toast({ title: "User deactivated" });
       },
       onError: () => toast({ title: "Failed to deactivate user", variant: "destructive" }),
+    },
+  });
+
+  const permanentDelete = usePermanentDeleteUser({
+    mutation: {
+      onSuccess: () => {
+        invalidateUsers();
+        setDeleteTarget(null);
+        toast({ title: "User permanently deleted" });
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        setDeleteTarget(null);
+        toast({ title: msg ?? "Failed to delete user", variant: "destructive" });
+      },
+    },
+  });
+
+  const resetUserPassword = useResetUserPassword({
+    mutation: {
+      onSuccess: () => {
+        setResetTarget(null);
+        setResetPassword("");
+        toast({ title: "Password reset successfully" });
+      },
+      onError: () => toast({ title: "Failed to reset password", variant: "destructive" }),
     },
   });
 
@@ -132,6 +164,18 @@ export default function UsersList() {
   const handleReactivate = (u: User) => {
     updateUser.mutate({ id: u.id, data: { isActive: true } });
   };
+
+  const handlePermanentDelete = () => {
+    if (!deleteTarget) return;
+    permanentDelete.mutate({ id: deleteTarget.id });
+  };
+
+  const handleResetPassword = () => {
+    if (!resetTarget || !resetPassword) return;
+    resetUserPassword.mutate({ id: resetTarget.id, data: { password: resetPassword } });
+  };
+
+  const isSelf = (u: User) => u.id === currentUser?.id;
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
@@ -177,17 +221,27 @@ export default function UsersList() {
               <Badge className={`text-xs font-medium border ${ROLE_COLORS[u.role] ?? ""}`} variant="outline">
                 {ROLE_LABELS[u.role] ?? u.role}
               </Badge>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <Button size="sm" variant="ghost" onClick={() => openEdit(u)} title="Edit user">
                   <Pencil className="w-4 h-4" />
                 </Button>
+                {!isSelf(u) && (
+                  <Button size="sm" variant="ghost" className="text-sky-600 hover:text-sky-700 hover:bg-sky-50" onClick={() => { setResetTarget(u); setResetPassword(""); }} title="Reset password">
+                    <KeyRound className="w-4 h-4" />
+                  </Button>
+                )}
                 {u.isActive ? (
-                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeactivateTarget(u)} title="Deactivate user" disabled={u.id === currentUser?.id}>
+                  <Button size="sm" variant="ghost" className="text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => setDeactivateTarget(u)} title="Deactivate user" disabled={isSelf(u)}>
                     <UserX className="w-4 h-4" />
                   </Button>
                 ) : (
                   <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleReactivate(u)} title="Reactivate user">
                     <UserIcon className="w-4 h-4" />
+                  </Button>
+                )}
+                {!isSelf(u) && u.role !== "md" && (
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTarget(u)} title="Permanently delete user">
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 )}
                 <Link href={`/users/${u.id}`}>
@@ -294,6 +348,34 @@ export default function UsersList() {
         </DialogContent>
       </Dialog>
 
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) { setResetTarget(null); setResetPassword(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset Password — {resetTarget?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">Set a new password for this user. They will need to use it on their next login.</p>
+            <div className="space-y-1.5">
+              <Label>New Password *</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); }}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={!resetPassword || resetUserPassword.isPending}>
+              {resetUserPassword.isPending ? "Resetting…" : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Deactivate Confirmation */}
       <AlertDialog open={!!deactivateTarget} onOpenChange={open => !open && setDeactivateTarget(null)}>
         <AlertDialogContent>
@@ -307,6 +389,33 @@ export default function UsersList() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeactivate} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
               Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the account from the system. This cannot be undone.
+              {(deleteTarget?.billStats?.total ?? 0) > 0 && (
+                <span className="block mt-2 font-medium text-amber-600">
+                  This user has {deleteTarget?.billStats?.total} bill{(deleteTarget?.billStats?.total ?? 0) !== 1 ? "s" : ""} — you must deactivate them instead.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePermanentDelete}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={permanentDelete.isPending}
+            >
+              {permanentDelete.isPending ? "Deleting…" : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

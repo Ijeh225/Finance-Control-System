@@ -1,12 +1,37 @@
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, notificationsTable, auditTable } from "@workspace/db";
+import { subscribe, unsubscribe } from "../lib/sse-broadcaster.js";
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 
 const router: IRouter = Router();
+
+// GET /notifications/stream — SSE stream for real-time notification delivery
+// Must be declared BEFORE /notifications/:id so Express matches it first
+router.get("/notifications/stream", (req, res): void => {
+  const actor = req.user!;
+  const userId = actor.id;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  res.write(": ping\n\n");
+  subscribe(userId, res);
+
+  const keepAlive = setInterval(() => {
+    try { res.write(": ping\n\n"); } catch { clearInterval(keepAlive); }
+  }, 25000);
+
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    unsubscribe(userId, res);
+  });
+});
 
 router.get("/notifications", async (req, res): Promise<void> => {
   const actor = req.user!;

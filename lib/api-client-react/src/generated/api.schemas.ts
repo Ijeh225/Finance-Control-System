@@ -554,6 +554,18 @@ export type DeactivateUser200 = {
   success: boolean;
 };
 
+export type PermanentDeleteUser200 = {
+  success: boolean;
+};
+
+export type ResetUserPasswordBody = {
+  password: string;
+};
+
+export type ResetUserPassword200 = {
+  success: boolean;
+};
+
 export type ListBillsParams = {
 status?: ListBillsStatus;
 userId?: string;

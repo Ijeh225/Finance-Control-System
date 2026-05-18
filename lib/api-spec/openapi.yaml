@@ -362,6 +362,64 @@ paths:
                     type: boolean
                 required: [success]
 
+  /users/{id}/permanent:
+    delete:
+      operationId: permanentDeleteUser
+      tags: [users]
+      summary: Permanently delete a user (no bills allowed)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+        "409":
+          description: User has existing bills
+
+  /users/{id}/reset-password:
+    post:
+      operationId: resetUserPassword
+      tags: [users]
+      summary: Reset another user's password (MD only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required: [password]
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
   /users/{id}/profile:
     get:
       operationId: getUserProfile
@@ -1324,6 +1382,19 @@ paths:
                 $ref: "#/components/schemas/WalletStatement"
 
   # ─── NOTIFICATIONS ───────────────────────────────────────────
+  /notifications/stream:
+    get:
+      operationId: streamNotifications
+      tags: [notifications]
+      summary: SSE stream for real-time notification delivery
+      responses:
+        "200":
+          description: SSE stream (text/event-stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
   /notifications:
     get:
       operationId: listNotifications

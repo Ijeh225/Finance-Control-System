@@ -87,11 +87,14 @@ import type {
   MarkAllNotificationsReadBody,
   Notification,
   PartialApproveBillBody,
+  PermanentDeleteUser200,
   ProcessPaymentInput,
   RejectBillBody,
   RequestAttachmentUploadInput,
   RequestAttachmentUploadResponse,
   RescheduleBillBody,
+  ResetUserPassword200,
+  ResetUserPasswordBody,
   TransferFunds200,
   TransferInput,
   UpdateBillInput,
@@ -1227,6 +1230,148 @@ export const useDeactivateUser = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeactivateUserMutationOptions(options));
+    }
+
+export const getPermanentDeleteUserUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}/permanent`
+}
+
+/**
+ * @summary Permanently delete a user (no bills allowed)
+ */
+export const permanentDeleteUser = async (id: string, options?: RequestInit): Promise<PermanentDeleteUser200> => {
+
+  return customFetch<PermanentDeleteUser200>(getPermanentDeleteUserUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getPermanentDeleteUserMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof permanentDeleteUser>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof permanentDeleteUser>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['permanentDeleteUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof permanentDeleteUser>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  permanentDeleteUser(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PermanentDeleteUserMutationResult = NonNullable<Awaited<ReturnType<typeof permanentDeleteUser>>>
+
+    export type PermanentDeleteUserMutationError = ErrorType<void>
+
+    /**
+ * @summary Permanently delete a user (no bills allowed)
+ */
+export const usePermanentDeleteUser = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof permanentDeleteUser>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof permanentDeleteUser>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getPermanentDeleteUserMutationOptions(options));
+    }
+
+export const getResetUserPasswordUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}/reset-password`
+}
+
+/**
+ * @summary Reset another user's password (MD only)
+ */
+export const resetUserPassword = async (id: string,
+    resetUserPasswordBody: ResetUserPasswordBody, options?: RequestInit): Promise<ResetUserPassword200> => {
+
+  return customFetch<ResetUserPassword200>(getResetUserPasswordUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      resetUserPasswordBody,)
+  }
+);}
+
+
+
+
+export const getResetUserPasswordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUserPassword>>, TError,{id: string;data: BodyType<ResetUserPasswordBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetUserPassword>>, TError,{id: string;data: BodyType<ResetUserPasswordBody>}, TContext> => {
+
+const mutationKey = ['resetUserPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetUserPassword>>, {id: string;data: BodyType<ResetUserPasswordBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resetUserPassword(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetUserPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof resetUserPassword>>>
+    export type ResetUserPasswordMutationBody = BodyType<ResetUserPasswordBody>
+    export type ResetUserPasswordMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset another user's password (MD only)
+ */
+export const useResetUserPassword = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetUserPassword>>, TError,{id: string;data: BodyType<ResetUserPasswordBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetUserPassword>>,
+        TError,
+        {id: string;data: BodyType<ResetUserPasswordBody>},
+        TContext
+      > => {
+      return useMutation(getResetUserPasswordMutationOptions(options));
     }
 
 export const getGetUserProfileUrl = (id: string,) => {
@@ -3979,6 +4124,83 @@ export function useGetWalletStatement<TData = Awaited<ReturnType<typeof getWalle
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetWalletStatementQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStreamNotificationsUrl = () => {
+
+
+
+
+  return `/api/notifications/stream`
+}
+
+/**
+ * @summary SSE stream for real-time notification delivery
+ */
+export const streamNotifications = async ( options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getStreamNotificationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getStreamNotificationsQueryKey = () => {
+    return [
+    `/api/notifications/stream`
+    ] as const;
+    }
+
+
+export const getStreamNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof streamNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getStreamNotificationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamNotifications>>> = ({ signal }) => streamNotifications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type StreamNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof streamNotifications>>>
+export type StreamNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary SSE stream for real-time notification delivery
+ */
+
+export function useStreamNotifications<TData = Awaited<ReturnType<typeof streamNotifications>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getStreamNotificationsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

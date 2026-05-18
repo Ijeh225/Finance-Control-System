@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, asc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
+import { publish } from "../lib/sse-broadcaster.js";
 
 const router: IRouter = Router();
 
@@ -26,6 +27,7 @@ async function notify(userId: string, type: string, title: string, body: string,
   await db.insert(notificationsTable).values({
     id: uid(), userId, type: type as "bill_approved", title, body, billId: billId ?? null
   });
+  publish(userId, { type: "new_notification" });
 }
 
 type Actor = { id: string; name: string; role: string };

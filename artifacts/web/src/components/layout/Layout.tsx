@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useViewingAs } from "@/context/ViewingAsContext";
 import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
+import { useNotificationStream } from "@/hooks/useNotificationStream";
 import {
   LayoutDashboard,
   Receipt,
@@ -56,6 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { selectedUserName, clearSelectedUser } = useViewingAs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isViewingAs = user?.role === "md" && !!selectedUserName;
+  useNotificationStream(user?.id);
 
   const { data: notifData } = useListNotifications(
     { userId: user?.id ?? "" },

@@ -178,4 +178,60 @@ router.delete("/users/:id", requireMd, async (req, res): Promise<void> => {
   res.json({ success: true });
 });
 
+// DELETE /users/:id/permanent — MD-only: hard delete (no bills allowed)
+router.delete("/users/:id/permanent", requireMd, async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const id = req.params["id"] as string;
+
+  if (actor.id === id) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  const [target] = await db
+    .select({ id: usersTable.id, role: usersTable.role })
+    .from(usersTable)
+    .where(eq(usersTable.id, id));
+  if (!target) { res.status(404).json({ error: "User not found" }); return; }
+  if (target.role === "md") {
+    res.status(400).json({ error: "Cannot delete an MD account" });
+    return;
+  }
+
+  const [bill] = await db
+    .select({ id: billsTable.id })
+    .from(billsTable)
+    .where(eq(billsTable.createdBy, id))
+    .limit(1);
+  if (bill) {
+    res.status(409).json({ error: "Cannot delete user with existing bills — deactivate instead" });
+    return;
+  }
+
+  await db.delete(usersTable).where(eq(usersTable.id, id));
+  res.json({ success: true });
+});
+
+// POST /users/:id/reset-password — MD-only: set a new password for another user
+router.post("/users/:id/reset-password", requireMd, async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const id = req.params["id"] as string;
+  const { password } = req.body as { password?: string };
+
+  if (!password) { res.status(400).json({ error: "password is required" }); return; }
+  if (actor.id === id) {
+    res.status(400).json({ error: "Cannot reset your own password via this route" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [updated] = await db
+    .update(usersTable)
+    .set({ passwordHash })
+    .where(eq(usersTable.id, id))
+    .returning(safeUserColumns);
+  if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+  res.json({ success: true });
+});
+
 export default router;

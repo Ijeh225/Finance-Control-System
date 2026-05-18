@@ -35,7 +35,7 @@ export default function AlertsScreen() {
 
   const { data, isLoading, refetch } = useListNotifications(
     { userId: currentUserId },
-    { query: { enabled: !!currentUserId, queryKey: notificationsQueryKey } }
+    { query: { enabled: !!currentUserId, queryKey: notificationsQueryKey, refetchInterval: 8000 } }
   );
 
   const unreadCount = data?.unreadCount ?? 0;

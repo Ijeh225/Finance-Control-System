@@ -403,6 +403,34 @@ export const DeactivateUserResponse = zod.object({
 
 
 /**
+ * @summary Permanently delete a user (no bills allowed)
+ */
+export const PermanentDeleteUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const PermanentDeleteUserResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Reset another user's password (MD only)
+ */
+export const ResetUserPasswordParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ResetUserPasswordBody = zod.object({
+  "password": zod.string()
+})
+
+export const ResetUserPasswordResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get user profile with wallets and bill stats
  */
 export const GetUserProfileParams = zod.object({

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { publish } from "../lib/sse-broadcaster.js";
 import { eq, desc, sql, and, gte, lte, ilike } from "drizzle-orm";
 import { db, walletsTable, usersTable, walletTransactionsTable, auditTable, notificationsTable } from "@workspace/db";
 
@@ -239,7 +240,10 @@ router.post("/wallets/transfer", async (req, res): Promise<void> => {
         body: `${wallet.name} balance is ₦${balance.toLocaleString("en-NG")} — below the ₦${threshold.toLocaleString("en-NG")} threshold.`,
         billId: null,
       }));
-      if (notifs.length) await db.insert(notificationsTable).values(notifs);
+      if (notifs.length) {
+        await db.insert(notificationsTable).values(notifs);
+        for (const n of notifs) publish(n.userId, { type: "new_notification" });
+      }
 
       await db.update(walletsTable).set({ isLow: true }).where(eq(walletsTable.id, wallet.id));
     } else if (threshold !== null && balance >= threshold && wallet.isLow) {
