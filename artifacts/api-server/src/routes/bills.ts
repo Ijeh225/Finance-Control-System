@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, asc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 import { publish } from "../lib/sse-broadcaster.js";
+import { sendMail } from "../lib/mailer.js";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,11 @@ async function notify(userId: string, type: string, title: string, body: string,
     id: uid(), userId, type: type as "bill_approved", title, body, billId: billId ?? null
   });
   publish(userId, { type: "new_notification" });
+  // Best-effort email — look up recipient and send; never throws
+  const [recipient] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+  if (recipient?.email) {
+    await sendMail({ to: recipient.email, subject: `FinCommand: ${title}`, text: `${body}\n\nLog in at FinCommand to take action.` });
+  }
 }
 
 type Actor = { id: string; name: string; role: string };
@@ -120,6 +126,18 @@ router.post("/bills", async (req, res): Promise<void> => {
   }).where(eq(vendorsTable.id, vendorId));
 
   await addAudit(bill!.id, actor.id, actor.name, "created", `Bill created for ${vendorName}`);
+
+  // Notify all active MD users about the new bill submission
+  const mds = await db.select({ id: usersTable.id, email: usersTable.email, name: usersTable.name })
+    .from(usersTable)
+    .where(and(eq(usersTable.role, "md"), eq(usersTable.isActive, true)));
+  const fmtAmount = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(parseFloat(amountStr));
+  await Promise.all(mds.map(md =>
+    notify(md.id, "bill_submitted", "New Bill Submitted",
+      `${actor.name} submitted a new bill for ${vendorName} — ${fmtAmount}. Scheduled: ${scheduledDate}.`,
+      bill!.id)
+  ));
+
   res.status(201).json(formatBill(bill as unknown as Record<string, unknown>));
 });
 

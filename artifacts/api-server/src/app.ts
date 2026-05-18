@@ -11,6 +11,10 @@ if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable is required");
 }
 
+// Email notifications are optional — warn once at startup if SMTP is not configured.
+// The mailer module handles its own warning; this import ensures it runs at startup.
+import("./lib/mailer.js").catch(() => { /* ignore — warning already logged by module */ });
+
 const app: Express = express();
 
 // Trust the first proxy hop so express-session sets secure cookies correctly

@@ -11,6 +11,7 @@ A private executive treasury control system for an MD and payment assistants to 
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
 - Required env: `SESSION_SECRET` — random secret for express-session (throws at startup if missing)
+- Optional env (email notifications): `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` — if any are missing, email is disabled and a warning is logged at startup; in-app notifications still work
 
 ## Stack
 
