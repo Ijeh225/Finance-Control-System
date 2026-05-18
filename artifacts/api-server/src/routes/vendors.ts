@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, sql, ne, inArray } from "drizzle-orm";
+import { eq, ilike, and, sql, ne, inArray, or } from "drizzle-orm";
 import { db, vendorsTable, billsTable, auditTable, walletTransactionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -32,14 +32,17 @@ router.get("/vendors", async (req, res): Promise<void> => {
   const search = req.query["search"] as string | undefined;
 
   if (actor.role !== "md") {
-    // PA: only see vendors they have at least one bill with
+    // PA: see vendors they created OR have at least one bill with
     const rows = await db.selectDistinct({ vendorId: billsTable.vendorId })
       .from(billsTable)
       .where(eq(billsTable.createdBy, actor.id));
-    const ids = rows.map(r => r.vendorId);
-    if (ids.length === 0) { res.json({ vendors: [] }); return; }
-    const conds = [inArray(vendorsTable.id, ids)];
-    if (search) conds.push(ilike(vendorsTable.name, `%${search}%`));
+    const billVendorIds = rows.map(r => r.vendorId);
+
+    const accessCond = billVendorIds.length
+      ? or(eq(vendorsTable.createdBy, actor.id), inArray(vendorsTable.id, billVendorIds))!
+      : eq(vendorsTable.createdBy, actor.id);
+
+    const conds = search ? [accessCond, ilike(vendorsTable.name, `%${search}%`)] : [accessCond];
     const vendors = await db.select().from(vendorsTable).where(and(...conds));
     res.json({ vendors: vendors.map(formatVendor) });
     return;
@@ -53,11 +56,13 @@ router.get("/vendors", async (req, res): Promise<void> => {
 });
 
 router.post("/vendors", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const { name, phone, email, bankName, accountNumber, containers, requestPurpose, relatedLink } = req.body;
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
   const [vendor] = await db.insert(vendorsTable).values({
     id: uid(), name, phone, email, bankName, accountNumber,
     containers: containers || null, requestPurpose: requestPurpose || null, relatedLink: relatedLink || null,
+    createdBy: actor.id,
   }).returning();
   res.status(201).json(formatVendor(vendor as Record<string, unknown>));
 });
@@ -68,12 +73,15 @@ router.get("/vendors/:id", async (req, res): Promise<void> => {
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  // PA: must have at least one bill with this vendor
+  // PA: must have created the vendor OR have at least one bill with it
   if (actor.role !== "md") {
-    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
-      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
-      .limit(1);
-    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    const isCreator = vendor.createdBy === actor.id;
+    if (!isCreator) {
+      const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+        .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+        .limit(1);
+      if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    }
   }
 
   // Bills: PA sees only their own; MD sees all (excluding withdrawn)
@@ -96,12 +104,15 @@ router.patch("/vendors/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  // PA: can only edit a vendor they have a bill with
+  // PA: can only edit a vendor they created or have a bill with
   if (actor.role !== "md") {
-    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
-      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
-      .limit(1);
-    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    const isCreator = existing.createdBy === actor.id;
+    if (!isCreator) {
+      const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+        .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+        .limit(1);
+      if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    }
   }
 
   const { name, phone, email, bankName, accountNumber, containers, requestPurpose, relatedLink } = req.body;
@@ -153,12 +164,15 @@ router.get("/vendors/:id/spending", async (req, res): Promise<void> => {
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  // PA: check access and scope to their own bills
+  // PA: must have created the vendor OR have a bill with it
   if (actor.role !== "md") {
-    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
-      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
-      .limit(1);
-    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    const isCreator = vendor.createdBy === actor.id;
+    if (!isCreator) {
+      const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+        .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+        .limit(1);
+      if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    }
   }
 
   // Get bill_payment transactions scoped to actor's bills for this vendor
@@ -197,12 +211,15 @@ router.get("/vendors/:id/liabilities", async (req, res): Promise<void> => {
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  // PA: check access and scope to their own bills
+  // PA: must have created the vendor OR have a bill with it
   if (actor.role !== "md") {
-    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
-      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
-      .limit(1);
-    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    const isCreator = vendor.createdBy === actor.id;
+    if (!isCreator) {
+      const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+        .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+        .limit(1);
+      if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+    }
   }
 
   const liabilityConds = [eq(billsTable.vendorId, rawId!), sql`${billsTable.outstandingBalance} > 0`];

@@ -17,6 +17,7 @@ export const vendorsTable = pgTable("vendors", {
   requestPurpose: text("request_purpose"),
   relatedLink: text("related_link"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("created_by"),
 });
 
 export const insertVendorSchema = createInsertSchema(vendorsTable).omit({ createdAt: true, totalBilled: true, totalPaid: true, outstandingBalance: true });
