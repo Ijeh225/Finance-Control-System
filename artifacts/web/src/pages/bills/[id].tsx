@@ -124,6 +124,9 @@ export default function BillDetail() {
   const { data: vendorsData } = useListVendors(undefined, {
     query: { queryKey: getListVendorsQueryKey() },
   });
+  const { data: billPaymentsData } = useGetBillPayments(id!, {
+    query: { enabled: !!id, queryKey: getGetBillPaymentsQueryKey(id!) },
+  });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: getGetBillQueryKey(id!) });
@@ -313,13 +316,6 @@ export default function BillDetail() {
   // Derived amounts — must be computed before permission flags
   const approvedAmt = bill.approvedAmount ?? bill.amount ?? 0;
   const alreadyPaid = bill.paidAmount ?? 0;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { data: billPaymentsData } = useGetBillPayments(id!, {
-    query: {
-      queryKey: getGetBillPaymentsQueryKey(id!),
-      enabled: Number(alreadyPaid) > 0,
-    },
-  });
   const remainingApproved = Math.max(0, Number(approvedAmt) - Number(alreadyPaid));
   const totalOutstanding = Number(bill.outstandingBalance ?? 0);
   // True when partial payment was processed but no more approved funds remain — waiting for MD to approve next tranche
