@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
+import { requireAuth } from "../lib/requireAuth";
 
 const router: IRouter = Router();
 
@@ -62,9 +63,8 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/auth/change-password", async (req, res): Promise<void> => {
-  const { userId } = req.session ?? {};
-  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.id;
 
   const { currentPassword, newPassword } = req.body as {
     currentPassword?: string;
