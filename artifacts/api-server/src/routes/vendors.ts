@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, sql, ne } from "drizzle-orm";
+import { eq, ilike, and, sql, ne, inArray } from "drizzle-orm";
 import { db, vendorsTable, billsTable, auditTable, walletTransactionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -28,7 +28,24 @@ function formatVendor(v: Record<string, unknown>) {
 }
 
 router.get("/vendors", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const search = req.query["search"] as string | undefined;
+
+  if (actor.role !== "md") {
+    // PA: only see vendors they have at least one bill with
+    const rows = await db.selectDistinct({ vendorId: billsTable.vendorId })
+      .from(billsTable)
+      .where(eq(billsTable.createdBy, actor.id));
+    const ids = rows.map(r => r.vendorId);
+    if (ids.length === 0) { res.json({ vendors: [] }); return; }
+    const conds = [inArray(vendorsTable.id, ids)];
+    if (search) conds.push(ilike(vendorsTable.name, `%${search}%`));
+    const vendors = await db.select().from(vendorsTable).where(and(...conds));
+    res.json({ vendors: vendors.map(formatVendor) });
+    return;
+  }
+
+  // MD: all vendors
   const vendors = search
     ? await db.select().from(vendorsTable).where(ilike(vendorsTable.name, `%${search}%`))
     : await db.select().from(vendorsTable);
@@ -46,23 +63,46 @@ router.post("/vendors", async (req, res): Promise<void> => {
 });
 
 router.get("/vendors/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
-  // Exclude withdrawn bills from the vendor ledger view
-  const bills = await db.select().from(billsTable).where(
-    and(eq(billsTable.vendorId, rawId!), ne(billsTable.status, "withdrawn"))
-  );
-  const activity = await db.select().from(auditTable)
-    .where(sql`${auditTable.billId} IN (SELECT id FROM bills WHERE vendor_id = ${rawId})`)
-    .limit(20);
+
+  // PA: must have at least one bill with this vendor
+  if (actor.role !== "md") {
+    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+      .limit(1);
+    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+  }
+
+  // Bills: PA sees only their own; MD sees all (excluding withdrawn)
+  const billConds = [eq(billsTable.vendorId, rawId!), ne(billsTable.status, "withdrawn")];
+  if (actor.role !== "md") billConds.push(eq(billsTable.createdBy, actor.id));
+  const bills = await db.select().from(billsTable).where(and(...billConds));
+
+  // Activity: scope to PA's bills only
+  const activityFilter = actor.role !== "md"
+    ? sql`${auditTable.billId} IN (SELECT id FROM bills WHERE vendor_id = ${rawId} AND created_by = ${actor.id})`
+    : sql`${auditTable.billId} IN (SELECT id FROM bills WHERE vendor_id = ${rawId})`;
+  const activity = await db.select().from(auditTable).where(activityFilter).limit(20);
+
   res.json({ ...formatVendor(vendor as Record<string, unknown>), bills: bills.map(formatBill), recentActivity: activity });
 });
 
 router.patch("/vendors/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [existing] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!existing) { res.status(404).json({ error: "Vendor not found" }); return; }
+
+  // PA: can only edit a vendor they have a bill with
+  if (actor.role !== "md") {
+    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+      .limit(1);
+    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+  }
 
   const { name, phone, email, bankName, accountNumber, containers, requestPurpose, relatedLink } = req.body;
   const updates: Record<string, unknown> = {};
@@ -108,11 +148,20 @@ router.delete("/vendors/:id", async (req, res): Promise<void> => {
 });
 
 router.get("/vendors/:id/spending", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  // Get all bill_payment wallet transactions linked to bills belonging to this vendor
+  // PA: check access and scope to their own bills
+  if (actor.role !== "md") {
+    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+      .limit(1);
+    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+  }
+
+  // Get bill_payment transactions scoped to actor's bills for this vendor
   const txRows = await db.select({
     amount: walletTransactionsTable.amount,
     createdAt: walletTransactionsTable.createdAt,
@@ -120,7 +169,7 @@ router.get("/vendors/:id/spending", async (req, res): Promise<void> => {
     .where(sql`
       ${walletTransactionsTable.type} = 'bill_payment'
       AND ${walletTransactionsTable.relatedBillId} IN (
-        SELECT id FROM bills WHERE vendor_id = ${rawId}
+        SELECT id FROM bills WHERE vendor_id = ${rawId}${actor.role !== "md" ? sql` AND created_by = ${actor.id}` : sql``}
       )
     `);
 
@@ -143,13 +192,22 @@ router.get("/vendors/:id/spending", async (req, res): Promise<void> => {
 });
 
 router.get("/vendors/:id/liabilities", async (req, res): Promise<void> => {
+  const actor = req.user!;
   const rawId = Array.isArray(req.params["id"]) ? req.params["id"][0] : req.params["id"];
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, rawId!));
   if (!vendor) { res.status(404).json({ error: "Vendor not found" }); return; }
 
-  const bills = await db.select().from(billsTable).where(
-    and(eq(billsTable.vendorId, rawId!), sql`${billsTable.outstandingBalance} > 0`)
-  );
+  // PA: check access and scope to their own bills
+  if (actor.role !== "md") {
+    const [check] = await db.select({ id: billsTable.id }).from(billsTable)
+      .where(and(eq(billsTable.vendorId, rawId!), eq(billsTable.createdBy, actor.id)))
+      .limit(1);
+    if (!check) { res.status(403).json({ error: "Access denied" }); return; }
+  }
+
+  const liabilityConds = [eq(billsTable.vendorId, rawId!), sql`${billsTable.outstandingBalance} > 0`];
+  if (actor.role !== "md") liabilityConds.push(eq(billsTable.createdBy, actor.id));
+  const bills = await db.select().from(billsTable).where(and(...liabilityConds));
 
   const now = Date.now();
   let aging0to7 = 0, aging8to14 = 0, aging15to30 = 0, aging30plus = 0;
