@@ -1,21 +1,21 @@
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import {
   useGetWallet, getGetWalletQueryKey,
   useGetWalletStatement, getGetWalletStatementQueryKey,
   useListWallets, getListWalletsQueryKey,
-  useTransferFunds, useUpdateWallet,
+  useTransferFunds, useUpdateWallet, useDeleteWallet,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, ArrowRightLeft, AlertTriangle,
   ChevronLeft as PrevIcon, ChevronRight as NextIcon,
-  Building2, Hash, Download, Receipt, TrendingUp, Search, X,
+  Building2, Hash, Download, Receipt, TrendingUp, Search, X, Trash2,
 } from "lucide-react";
 
 const LARGE_TRANSFER_THRESHOLD = 500_000;
@@ -48,8 +48,11 @@ export default function WalletDetail() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const pageSize = 20;
+
+  const [showDelete, setShowDelete] = useState(false);
 
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferStep, setTransferStep] = useState<TransferStep>("form");
@@ -97,6 +100,21 @@ export default function WalletDetail() {
       onError: (err: unknown) => {
         const msg = (err as { data?: { error?: string } })?.data?.error;
         toast({ title: msg ?? "Top-up failed", variant: "destructive" });
+      },
+    },
+  });
+
+  const deleteWallet = useDeleteWallet({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListWalletsQueryKey() });
+        toast({ title: "Wallet deleted" });
+        navigate("/wallets");
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Failed to delete wallet", variant: "destructive" });
+        setShowDelete(false);
       },
     },
   });
@@ -374,6 +392,63 @@ export default function WalletDetail() {
           </>
         )}
       </Card>
+
+      {/* Danger Zone */}
+      {user?.role !== "treasury" && (
+        <Card className="shadow-sm border-destructive/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm uppercase tracking-wider font-semibold text-destructive flex items-center gap-2">
+              <Trash2 className="w-4 h-4" /> Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Delete this wallet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Permanently removes the wallet and its transaction history.
+                {(wallet.balance ?? 0) !== 0
+                  ? " You must transfer out all funds before deleting."
+                  : " This action cannot be undone."}
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDelete(true)}
+              disabled={(wallet.balance ?? 0) !== 0}
+              title={(wallet.balance ?? 0) !== 0 ? "Transfer out all funds before deleting" : "Delete wallet"}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDelete} onOpenChange={setShowDelete}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-4 h-4" /> Delete Wallet
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete <span className="font-semibold text-foreground">{wallet.name}</span> and all its transaction history. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleteWallet.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteWallet.isPending}
+              onClick={() => deleteWallet.mutate({ id: id! })}
+            >
+              {deleteWallet.isPending ? "Deleting…" : "Yes, delete wallet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Transfer Dialog */}
       <Dialog open={showTransfer} onOpenChange={open => { if (!open) closeTransfer(); }}>

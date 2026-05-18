@@ -39,6 +39,7 @@ import type {
   DeleteBillAttachment200,
   DeleteNotification200,
   DeleteVendor200,
+  DeleteWallet200,
   EscalateBillBody,
   ExportReportParams,
   ExportVendorStatementParams,
@@ -4049,6 +4050,76 @@ export function useGetWallet<TData = Awaited<ReturnType<typeof getWallet>>, TErr
 
 
 
+
+export const getDeleteWalletUrl = (id: string,) => {
+
+
+
+
+  return `/api/wallets/${id}`
+}
+
+/**
+ * @summary Delete a wallet (must have zero balance)
+ */
+export const deleteWallet = async (id: string, options?: RequestInit): Promise<DeleteWallet200> => {
+
+  return customFetch<DeleteWallet200>(getDeleteWalletUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteWalletMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWallet>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWallet>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteWallet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWallet>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteWallet(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWalletMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWallet>>>
+
+    export type DeleteWalletMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a wallet (must have zero balance)
+ */
+export const useDeleteWallet = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWallet>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWallet>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteWalletMutationOptions(options));
+    }
 
 export const getUpdateWalletUrl = (id: string,) => {
 

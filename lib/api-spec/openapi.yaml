@@ -1326,6 +1326,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WalletDetail"
+    delete:
+      operationId: deleteWallet
+      tags: [wallets]
+      summary: Delete a wallet (must have zero balance)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Wallet deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+        "400":
+          description: Wallet has non-zero balance
+        "403":
+          description: Access denied
+        "404":
+          description: Wallet not found
     patch:
       operationId: updateWallet
       tags: [wallets]

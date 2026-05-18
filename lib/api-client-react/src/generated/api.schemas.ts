@@ -735,6 +735,10 @@ export type ListWallets200 = {
   wallets: Wallet[];
 };
 
+export type DeleteWallet200 = {
+  success: boolean;
+};
+
 export type UpdateWalletBody = {
   balance?: number;
   name?: string;

@@ -408,4 +408,36 @@ router.patch("/wallets/:id", async (req, res): Promise<void> => {
   res.json(fmtWallet(wallet, ownerName));
 });
 
+// DELETE /wallets/:id — MD or wallet owner
+// Blocked if the wallet has a non-zero balance (must be emptied first).
+router.delete("/wallets/:id", async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const id = req.params["id"] as string;
+
+  if (actor.role === "treasury") {
+    res.status(403).json({ error: "Treasury role cannot delete wallets" }); return;
+  }
+
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, id));
+  if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+
+  // PA: can only delete wallets they own
+  if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
+    res.status(403).json({ error: "Access denied" }); return;
+  }
+
+  const balance = parseFloat(String(wallet.balance ?? 0));
+  if (balance !== 0) {
+    res.status(400).json({
+      error: `Cannot delete a wallet with a non-zero balance (${wallet.currency ?? "NGN"} ${balance.toLocaleString("en-NG")}). Transfer or withdraw the funds first.`,
+    });
+    return;
+  }
+
+  await db.delete(walletsTable).where(eq(walletsTable.id, id));
+
+  req.log.info({ walletId: id, actor: actor.id }, "Wallet deleted");
+  res.json({ success: true });
+});
+
 export default router;

@@ -1565,6 +1565,18 @@ export const GetWalletResponse = zod.object({
 
 
 /**
+ * @summary Delete a wallet (must have zero balance)
+ */
+export const DeleteWalletParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteWalletResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Update wallet balance
  */
 export const UpdateWalletParams = zod.object({
