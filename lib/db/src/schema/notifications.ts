@@ -11,6 +11,8 @@ export const notificationsTable = pgTable("notifications", {
       "bill_rejected",
       "bill_partial",
       "bill_held",
+      "bill_submitted",
+      "payment_processed",
       "comment_added",
       "wallet_low",
       "overdue_warning",

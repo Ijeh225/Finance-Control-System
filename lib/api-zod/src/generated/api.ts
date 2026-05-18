@@ -515,7 +515,7 @@ export const GetUserProfileResponse = zod.object({
  * @summary List bills with optional filters
  */
 export const ListBillsQueryParams = zod.object({
-  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue']).optional(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'on_hold', 'partial', 'paid', 'overdue', 'withdrawn']).optional(),
   "userId": zod.coerce.string().optional(),
   "vendorId": zod.coerce.string().optional(),
   "priority": zod.enum(['low', 'medium', 'high', 'urgent']).optional(),

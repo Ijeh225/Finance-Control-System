@@ -27,7 +27,7 @@ async function addAudit(billId: string, userId: string, userName: string, action
 
 async function notify(userId: string, type: string, title: string, body: string, billId?: string) {
   await db.insert(notificationsTable).values({
-    id: uid(), userId, type: type as "bill_approved", title, body, billId: billId ?? null
+    id: uid(), userId, type: type as typeof notificationsTable.$inferInsert["type"], title, body, billId: billId ?? null
   });
   publish(userId, { type: "new_notification" });
   // Best-effort email — entire email path is guarded so it NEVER breaks the API response

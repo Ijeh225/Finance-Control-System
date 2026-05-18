@@ -13,7 +13,7 @@ if (!process.env.SESSION_SECRET) {
 
 // Email notifications are optional — warn once at startup if SMTP is not configured.
 // The mailer module handles its own warning; this import ensures it runs at startup.
-import("./lib/mailer.js").catch(() => { /* ignore — warning already logged by module */ });
+import("./lib/mailer.js").catch(err => logger.warn({ err }, "Mailer module failed to load"));
 
 const app: Express = express();
 

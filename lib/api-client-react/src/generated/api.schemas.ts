@@ -586,6 +586,7 @@ export const ListBillsStatus = {
   partial: 'partial',
   paid: 'paid',
   overdue: 'overdue',
+  withdrawn: 'withdrawn',
 } as const;
 
 export type ListBillsPriority = typeof ListBillsPriority[keyof typeof ListBillsPriority];

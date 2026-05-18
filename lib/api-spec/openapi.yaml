@@ -450,7 +450,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, approved, rejected, on_hold, partial, paid, overdue]
+            enum: [pending, approved, rejected, on_hold, partial, paid, overdue, withdrawn]
         - name: userId
           in: query
           schema:
