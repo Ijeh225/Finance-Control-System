@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, lt, lte, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, notInArray, sql } from "drizzle-orm";
 import { db, billsTable, walletsTable, notificationsTable, auditTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -86,12 +86,14 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   });
 });
 
+const ACTIONABLE_STATUSES = ["pending", "approved", "partial", "on_hold", "overdue"] as const;
+
 router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
   const t = today();
   const conditions: ReturnType<typeof eq>[] = [
     eq(billsTable.scheduledDate, t),
-    notInArray(billsTable.status, ["paid", "rejected"]),
+    inArray(billsTable.status, [...ACTIONABLE_STATUSES]),
   ];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conditions));
@@ -104,7 +106,7 @@ router.get("/dashboard/scheduled-tomorrow", async (req, res): Promise<void> => {
   const tom = tomorrow();
   const conditions: ReturnType<typeof eq>[] = [
     eq(billsTable.scheduledDate, tom),
-    notInArray(billsTable.status, ["paid", "rejected"]),
+    inArray(billsTable.status, [...ACTIONABLE_STATUSES]),
   ];
   if (userId) conditions.push(eq(billsTable.createdBy, userId));
   const bills = await db.select().from(billsTable).where(and(...conditions));
