@@ -1910,8 +1910,10 @@ components:
           type: string
         email:
           type: string
+          nullable: true
         phone:
           type: string
+          nullable: true
         role:
           type: string
           enum: [md, treasury, payment_assistant]

@@ -318,8 +318,8 @@ export const UpdateMyProfileBody = zod.object({
 export const UpdateMyProfileResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "email": zod.string().optional(),
-  "phone": zod.string().optional(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "role": zod.enum(['md', 'treasury', 'payment_assistant'])
 })
 
