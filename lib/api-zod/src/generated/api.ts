@@ -307,6 +307,24 @@ export const ChangePasswordResponse = zod.object({
 
 
 /**
+ * @summary Update own name, email, and phone (any authenticated user)
+ */
+export const UpdateMyProfileBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
+})
+
+export const UpdateMyProfileResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "role": zod.enum(['md', 'treasury', 'payment_assistant'])
+})
+
+
+/**
  * @summary List all treasury users
  */
 export const ListUsersResponse = zod.object({

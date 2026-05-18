@@ -38,6 +38,29 @@ export interface User {
   billStats?: UserBillStats;
 }
 
+export interface UpdateProfileInput {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+export type UserProfileBasicRole = typeof UserProfileBasicRole[keyof typeof UserProfileBasicRole];
+
+
+export const UserProfileBasicRole = {
+  md: 'md',
+  treasury: 'treasury',
+  payment_assistant: 'payment_assistant',
+} as const;
+
+export interface UserProfileBasic {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: UserProfileBasicRole;
+}
+
 export type CreateUserInputRole = typeof CreateUserInputRole[keyof typeof CreateUserInputRole];
 
 

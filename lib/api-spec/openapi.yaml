@@ -294,6 +294,29 @@ paths:
         "400":
           description: Wrong current password, too short, or same as current
 
+  /auth/me:
+    patch:
+      operationId: updateMyProfile
+      tags: [users]
+      summary: Update own name, email, and phone (any authenticated user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileInput"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileBasic"
+        "400":
+          description: Validation error
+        "409":
+          description: Email already in use
+
   # ─── USERS ───────────────────────────────────────────────────
   /users:
     get:
@@ -1867,6 +1890,32 @@ components:
               type: number
           required: [total, pending, approved, totalAmount, paidAmount, outstandingAmount]
       required: [id, name, role, isActive, createdAt]
+
+    UpdateProfileInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+
+    UserProfileBasic:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [md, treasury, payment_assistant]
+      required: [id, name, role]
 
     CreateUserInput:
       type: object

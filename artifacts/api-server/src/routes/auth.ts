@@ -99,6 +99,61 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
   res.json({ success: true });
 });
 
+router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
+  const actor = req.user!;
+  const { name, email, phone } = req.body as {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+
+  const updates: Record<string, unknown> = {};
+  if (name !== undefined) {
+    const trimmed = name.trim();
+    if (!trimmed) { res.status(400).json({ error: "Name cannot be empty" }); return; }
+    updates["name"] = trimmed;
+  }
+  if (email !== undefined) {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed) { res.status(400).json({ error: "Email cannot be empty" }); return; }
+    const [existing] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.email, trimmed));
+    if (existing && existing.id !== actor.id) {
+      res.status(409).json({ error: "That email address is already in use" }); return;
+    }
+    updates["email"] = trimmed;
+  }
+  if (phone !== undefined) updates["phone"] = phone.trim() || null;
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" }); return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, actor.id))
+    .returning({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      phone: usersTable.phone,
+      role: usersTable.role,
+    });
+
+  if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+
+  req.session.userName = updated.name;
+  req.session.userEmail = updated.email ?? actor.email;
+  req.session.save((err) => {
+    if (err) req.log.warn({ err }, "Failed to save session after profile update");
+  });
+
+  res.json(updated);
+});
+
 router.post("/auth/logout", (req, res): void => {
   req.session.destroy(() => {
     res.clearCookie("fincommand.sid");

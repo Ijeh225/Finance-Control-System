@@ -6,8 +6,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, User, Mail, Shield, KeyRound, Eye, EyeOff } from "lucide-react";
-import { useChangePassword } from "@workspace/api-client-react";
+import { ShieldAlert, User, Mail, Shield, KeyRound, Eye, EyeOff, Phone, Pencil, X, Check } from "lucide-react";
+import { useChangePassword, useUpdateMyProfile } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
@@ -17,9 +17,14 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const roleInfo = ROLE_LABELS[user?.role ?? ""] ?? { label: user?.role ?? "", color: "bg-muted text-muted-foreground border-border" };
+
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -29,7 +34,21 @@ export default function Settings() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmError, setConfirmError] = useState("");
 
-  const { mutate: changePassword, isPending } = useChangePassword({
+  const { mutate: updateProfile, isPending: isProfilePending } = useUpdateMyProfile({
+    mutation: {
+      onSuccess: async () => {
+        await refreshUser();
+        toast({ title: "Profile updated" });
+        setEditingProfile(false);
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { data?: { error?: string } })?.data?.error;
+        toast({ title: msg ?? "Failed to update profile", variant: "destructive" });
+      },
+    },
+  });
+
+  const { mutate: changePassword, isPending: isPasswordPending } = useChangePassword({
     mutation: {
       onSuccess: () => {
         toast({ title: "Password changed successfully" });
@@ -44,6 +63,27 @@ export default function Settings() {
       },
     },
   });
+
+  function startEditProfile() {
+    setProfileName(user?.name ?? "");
+    setProfileEmail(user?.email ?? "");
+    setProfilePhone(user?.phone ?? "");
+    setEditingProfile(true);
+  }
+
+  function cancelEditProfile() {
+    setEditingProfile(false);
+  }
+
+  function handleProfileSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const data: { name?: string; email?: string; phone?: string } = {};
+    if (profileName.trim() !== (user?.name ?? "")) data.name = profileName.trim();
+    if (profileEmail.trim() !== (user?.email ?? "")) data.email = profileEmail.trim();
+    if (profilePhone.trim() !== (user?.phone ?? "")) data.phone = profilePhone.trim();
+    if (Object.keys(data).length === 0) { setEditingProfile(false); return; }
+    updateProfile({ data });
+  }
 
   function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,40 +103,105 @@ export default function Settings() {
       </div>
 
       <Card className="shadow-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
             <User className="w-4 h-4" /> Profile
           </CardTitle>
+          {!editingProfile && (
+            <Button variant="ghost" size="sm" onClick={startEditProfile} className="h-8 gap-1.5 text-xs">
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary font-bold text-2xl">
-              {user?.name?.charAt(0).toUpperCase()}
+            <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center text-primary font-bold text-2xl shrink-0">
+              {(editingProfile ? profileName : user?.name)?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="text-xl font-bold" data-testid="text-user-name">{user?.name}</p>
+              {editingProfile ? (
+                <p className="text-xl font-bold">{profileName || <span className="text-muted-foreground">Name</span>}</p>
+              ) : (
+                <p className="text-xl font-bold" data-testid="text-user-name">{user?.name}</p>
+              )}
               <span className={`text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded border inline-block mt-1 ${roleInfo.color}`} data-testid="text-user-role">
                 {roleInfo.label}
               </span>
             </div>
           </div>
           <Separator />
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Email</p>
-                <p className="text-sm font-medium font-mono" data-testid="text-user-email">{user?.email}</p>
+
+          {editingProfile ? (
+            <form onSubmit={handleProfileSubmit} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-name">Full Name</Label>
+                <Input
+                  id="profile-name"
+                  value={profileName}
+                  onChange={e => setProfileName(e.target.value)}
+                  placeholder="Your full name"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-email">Email</Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  value={profileEmail}
+                  onChange={e => setProfileEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-phone">Phone <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  id="profile-phone"
+                  type="tel"
+                  value={profilePhone}
+                  onChange={e => setProfilePhone(e.target.value)}
+                  placeholder="+234 800 000 0000"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button type="submit" size="sm" disabled={isProfilePending} className="gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  {isProfilePending ? "Saving…" : "Save Changes"}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={cancelEditProfile} disabled={isProfilePending} className="gap-1.5">
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Email</p>
+                  <p className="text-sm font-medium font-mono" data-testid="text-user-email">{user?.email}</p>
+                </div>
+              </div>
+              {user?.phone && (
+                <div className="flex items-center gap-3">
+                  <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Phone</p>
+                    <p className="text-sm font-medium font-mono">{user.phone}</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div>
+                  <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Access Role</p>
+                  <p className="text-sm font-medium">{roleInfo.label}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div>
-                <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Access Role</p>
-                <p className="text-sm font-medium">{roleInfo.label}</p>
-              </div>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -178,8 +283,8 @@ export default function Settings() {
               {confirmError && <p className="text-xs text-destructive">{confirmError}</p>}
             </div>
 
-            <Button type="submit" disabled={isPending} className="w-full">
-              {isPending ? "Updating…" : "Update Password"}
+            <Button type="submit" disabled={isPasswordPending} className="w-full">
+              {isPasswordPending ? "Updating…" : "Update Password"}
             </Button>
           </form>
         </CardContent>
