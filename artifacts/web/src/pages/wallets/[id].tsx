@@ -405,18 +405,13 @@ export default function WalletDetail() {
             <div>
               <p className="text-sm font-medium">Delete this wallet</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Permanently removes the wallet and its transaction history.
-                {(wallet.balance ?? 0) !== 0
-                  ? " You must transfer out all funds before deleting."
-                  : " This action cannot be undone."}
+                Permanently removes the wallet and its transaction history. This action cannot be undone.
               </p>
             </div>
             <Button
               variant="destructive"
               size="sm"
               onClick={() => setShowDelete(true)}
-              disabled={(wallet.balance ?? 0) !== 0}
-              title={(wallet.balance ?? 0) !== 0 ? "Transfer out all funds before deleting" : "Delete wallet"}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
             </Button>
