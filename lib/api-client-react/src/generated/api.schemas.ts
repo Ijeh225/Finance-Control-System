@@ -546,6 +546,15 @@ export type GetDashboardCashflow200 = {
   days: number;
 };
 
+export type ChangePasswordBody = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type ChangePassword200 = {
+  success: boolean;
+};
+
 export type ListUsers200 = {
   users: User[];
 };

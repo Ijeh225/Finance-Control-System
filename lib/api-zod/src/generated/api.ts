@@ -294,6 +294,19 @@ export const GetDashboardCashflowResponse = zod.object({
 
 
 /**
+ * @summary Change own password (any authenticated user)
+ */
+export const ChangePasswordBody = zod.object({
+  "currentPassword": zod.string(),
+  "newPassword": zod.string()
+})
+
+export const ChangePasswordResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary List all treasury users
  */
 export const ListUsersResponse = zod.object({

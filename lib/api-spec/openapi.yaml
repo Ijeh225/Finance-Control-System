@@ -262,6 +262,38 @@ paths:
                     type: integer
                 required: [data, days]
 
+  # ─── AUTH ────────────────────────────────────────────────────
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [users]
+      summary: Change own password (any authenticated user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+              required: [currentPassword, newPassword]
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+        "400":
+          description: Wrong current password, too short, or same as current
+
   # ─── USERS ───────────────────────────────────────────────────
   /users:
     get:

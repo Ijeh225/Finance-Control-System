@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ShieldAlert, User, Mail, Shield } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { ShieldAlert, User, Mail, Shield, KeyRound, Eye, EyeOff } from "lucide-react";
+import { useChangePassword } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   md: { label: "Chief Executive (MD)", color: "bg-primary/10 text-primary border-primary/20" },
@@ -12,7 +18,42 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
 
 export default function Settings() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const roleInfo = ROLE_LABELS[user?.role ?? ""] ?? { label: user?.role ?? "", color: "bg-muted text-muted-foreground border-border" };
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmError, setConfirmError] = useState("");
+
+  const { mutate: changePassword, isPending } = useChangePassword({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Password changed successfully" });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setConfirmError("");
+      },
+      onError: (err: unknown) => {
+        const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+        toast({ title: msg ?? "Failed to change password", variant: "destructive" });
+      },
+    },
+  });
+
+  function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setConfirmError("Passwords do not match");
+      return;
+    }
+    setConfirmError("");
+    changePassword({ data: { currentPassword, newPassword } });
+  }
 
   return (
     <div className="p-6 md:p-10 max-w-2xl mx-auto space-y-6">
@@ -56,6 +97,91 @@ export default function Settings() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm uppercase tracking-wider font-semibold text-muted-foreground flex items-center gap-2">
+            <KeyRound className="w-4 h-4" /> Change Password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="current-password">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="current-password"
+                  type={showCurrent ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  placeholder="Enter your current password"
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showNew ? "text" : "password"}
+                  value={newPassword}
+                  onChange={e => { setNewPassword(e.target.value); setConfirmError(""); }}
+                  placeholder="At least 8 characters"
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirm ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={e => { setConfirmPassword(e.target.value); setConfirmError(""); }}
+                  placeholder="Repeat new password"
+                  required
+                  className={`pr-10 ${confirmError ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {confirmError && <p className="text-xs text-destructive">{confirmError}</p>}
+            </div>
+
+            <Button type="submit" disabled={isPending} className="w-full">
+              {isPending ? "Updating…" : "Update Password"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

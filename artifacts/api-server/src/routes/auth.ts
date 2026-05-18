@@ -62,6 +62,43 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   });
 });
 
+router.post("/auth/change-password", async (req, res): Promise<void> => {
+  const { userId } = req.session ?? {};
+  if (!userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+
+  if (!currentPassword || !newPassword) {
+    res.status(400).json({ error: "currentPassword and newPassword are required" }); return;
+  }
+  if (newPassword.length < 8) {
+    res.status(400).json({ error: "New password must be at least 8 characters" }); return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user || !user.passwordHash) {
+    res.status(404).json({ error: "User not found" }); return;
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    res.status(400).json({ error: "Current password is incorrect" }); return;
+  }
+
+  const samePassword = await bcrypt.compare(newPassword, user.passwordHash);
+  if (samePassword) {
+    res.status(400).json({ error: "New password must be different from your current password" }); return;
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
+
+  res.json({ success: true });
+});
+
 router.post("/auth/logout", (req, res): void => {
   req.session.destroy(() => {
     res.clearCookie("fincommand.sid");
