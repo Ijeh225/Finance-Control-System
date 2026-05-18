@@ -32,7 +32,11 @@ async function notify(userId: string, type: string, title: string, body: string,
   // Best-effort email — look up recipient and send; never throws
   const [recipient] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
   if (recipient?.email) {
-    await sendMail({ to: recipient.email, subject: `FinCommand: ${title}`, text: `${body}\n\nLog in at FinCommand to take action.` });
+    // Always include bill reference in email when available so the recipient can identify the bill
+    const emailBody = billId
+      ? `${body}\n\nBill Reference: ${billId.toUpperCase()}\n\nLog in at FinCommand to take action.`
+      : `${body}\n\nLog in at FinCommand to take action.`;
+    await sendMail({ to: recipient.email, subject: `FinCommand: ${title}`, text: emailBody });
   }
 }
 
@@ -268,7 +272,8 @@ router.post("/bills/:id/reject", async (req, res): Promise<void> => {
   const [bill] = await db.update(billsTable).set({ status: "rejected" }).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "rejected", comment ?? "Bill rejected");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
-  await notify(existing.createdBy, "bill_rejected", "Bill Rejected", `Your bill for ${existing.vendorName} has been rejected.`, rawId!);
+  const rejFmt = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
+  await notify(existing.createdBy, "bill_rejected", "Bill Rejected", `Your bill for ${existing.vendorName} (${rejFmt.format(parseFloat(String(existing.amount)))}) has been rejected.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -284,7 +289,8 @@ router.post("/bills/:id/hold", async (req, res): Promise<void> => {
   const [bill] = await db.update(billsTable).set(updates).where(eq(billsTable.id, rawId!)).returning();
   await addAudit(rawId!, actor.id, actor.name, "held", comment ?? "Bill placed on hold");
   if (comment) await db.insert(commentsTable).values({ id: uid(), billId: rawId!, authorId: actor.id, authorName: actor.name, authorRole: actor.role, text: comment });
-  await notify(existing.createdBy, "bill_held", "Bill On Hold", `Your bill for ${existing.vendorName} has been placed on hold.`, rawId!);
+  const holdFmt = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
+  await notify(existing.createdBy, "bill_held", "Bill On Hold", `Your bill for ${existing.vendorName} (${holdFmt.format(parseFloat(String(existing.amount)))}) has been placed on hold.`, rawId!);
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 
@@ -624,11 +630,13 @@ router.post("/bills/:id/comments", async (req, res): Promise<void> => {
   //   • MD commenting  → notify the PA who created the bill (skip if actor created it)
   //   • non-MD commenting → notify all active MD users except the actor
   const snippet = `"${text.trim().slice(0, 60)}${text.trim().length > 60 ? "…" : ""}"`;
+  const commentFmt = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" });
+  const billAmountStr = commentFmt.format(parseFloat(String(bill.amount)));
   if (actor.role === "md") {
     // MD commenting — notify the PA creator if they are a different person
     if (bill.createdBy !== actor.id) {
       await notify(bill.createdBy, "comment_added", "New Comment on Your Bill",
-        `${actor.name} commented on your bill for ${bill.vendorName}: ${snippet}`, rawId!);
+        `${actor.name} commented on your bill for ${bill.vendorName} (${billAmountStr}): ${snippet}`, rawId!);
     }
   } else {
     // PA (or other non-MD) commenting — notify all active MD users, skip self
@@ -640,7 +648,7 @@ router.post("/bills/:id/comments", async (req, res): Promise<void> => {
         .filter(md => md.id !== actor.id)
         .map(md =>
           notify(md.id, "comment_added", "New Comment on Bill",
-            `${actor.name} commented on a bill for ${bill.vendorName}: ${snippet}`, rawId!)
+            `${actor.name} commented on a bill for ${bill.vendorName} (${billAmountStr}): ${snippet}`, rawId!)
         )
     );
   }
