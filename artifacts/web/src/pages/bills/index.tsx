@@ -285,12 +285,13 @@ export default function BillsList() {
       </Card>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-lg flex flex-col max-h-[90dvh] p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
             <DialogTitle>Submit Bill for Approval</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-1">
+          <div className="overflow-y-auto flex-1 px-6 py-4">
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">Vendor *</Label>
               <Select value={form.vendorId} onValueChange={(v) => setForm(f => ({ ...f, vendorId: v }))}>
@@ -429,8 +430,9 @@ export default function BillsList() {
               )}
             </div>
           </div>
+          </div>{/* end scrollable body */}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 px-6 py-4 shrink-0 border-t bg-background">
             <Button variant="outline" onClick={resetCreateDialog}>Cancel</Button>
             <Button
               disabled={!form.vendorId || !form.description || !form.amount || !form.scheduledDate || isSubmitting}
