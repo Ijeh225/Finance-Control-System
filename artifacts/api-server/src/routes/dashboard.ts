@@ -4,11 +4,14 @@ import { db, billsTable, walletsTable, notificationsTable, auditTable } from "@w
 
 const router: IRouter = Router();
 
+const WAT_TZ = "Africa/Lagos"; // UTC+1, no DST
+const WAT_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: WAT_TZ });
+
 function today() {
-  return new Date().toISOString().split("T")[0]!;
+  return WAT_FMT.format(new Date());
 }
 function tomorrow() {
-  return new Date(Date.now() + 86400000).toISOString().split("T")[0]!;
+  return WAT_FMT.format(new Date(Date.now() + 86_400_000));
 }
 
 /**
