@@ -693,9 +693,8 @@ export default function BillDetail() {
                 variant="outline"
                 className="border-sky-300 text-sky-700 hover:bg-sky-50"
                 onClick={() => {
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  const dateStr = tomorrow.toISOString().split("T")[0]!;
+                  const watFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" });
+                  const dateStr = watFmt.format(new Date(Date.now() + 86_400_000));
                   reschedule.mutate({ id: id!, data: { scheduledDate: dateStr } });
                 }}
                 disabled={reschedule.isPending}

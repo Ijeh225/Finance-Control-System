@@ -45,46 +45,21 @@ async function loadBill(billId: string, actor: Actor) {
 // ─── List ────────────────────────────────────────────────────────────────────
 
 // ─── Auto-overdue helper ──────────────────────────────────────────────────────
-// Flips any pending bill whose scheduledDate is in the past to "overdue".
+// Flips any pending bill whose scheduledDate is strictly in the past to "overdue".
+// Uses WAT (Africa/Lagos, UTC+1) so dates match Nigeria local time.
 // Called before every list/dashboard fetch so the status is always current.
+const WAT_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" });
+
 async function markOverdueBills(userId?: string): Promise<void> {
-  const now = new Date();
-  const today = now.toISOString().split("T")[0]!;
-  // Tomorrow's date string
-  const tomorrowDate = new Date(now);
-  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = tomorrowDate.toISOString().split("T")[0]!;
-  // Yesterday's date string — bills from exactly yesterday get one free reschedule to tomorrow
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = yesterdayDate.toISOString().split("T")[0]!;
+  const today = WAT_FMT.format(new Date());
 
-  const baseConditions = (scheduledDate: string) => {
-    const conds: ReturnType<typeof eq>[] = [
-      eq(billsTable.status, "pending"),
-      eq(billsTable.scheduledDate, scheduledDate),
-    ];
-    if (userId) conds.push(eq(billsTable.createdBy, userId));
-    return conds;
-  };
-
-  // Bills scheduled for yesterday get auto-rescheduled to tomorrow (one free bump)
-  await db.update(billsTable)
-    .set({ scheduledDate: tomorrow })
-    .where(and(...baseConditions(yesterday)));
-
-  // Bills scheduled for today also get bumped to tomorrow (still "today" but missed)
-  await db.update(billsTable)
-    .set({ scheduledDate: tomorrow })
-    .where(and(...baseConditions(today)));
-
-  // Bills scheduled for 2+ days ago become overdue
-  const oldConditions: ReturnType<typeof eq>[] = [
+  // Bills with a scheduled date strictly before today become overdue
+  const conditions: ReturnType<typeof eq>[] = [
     eq(billsTable.status, "pending"),
-    lt(billsTable.scheduledDate, yesterday),
+    lt(billsTable.scheduledDate, today),
   ];
-  if (userId) oldConditions.push(eq(billsTable.createdBy, userId));
-  await db.update(billsTable).set({ status: "overdue" }).where(and(...oldConditions));
+  if (userId) conditions.push(eq(billsTable.createdBy, userId));
+  await db.update(billsTable).set({ status: "overdue" }).where(and(...conditions));
 }
 
 router.get("/bills", async (req, res): Promise<void> => {
