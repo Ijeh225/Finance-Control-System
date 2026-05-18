@@ -6,6 +6,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updateUser: (patch: Partial<User>) => void;
   isLoading: boolean;
 }
 
@@ -32,6 +33,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchMe();
   };
 
+  const updateUser = (patch: Partial<User>) => {
+    setUser(prev => prev ? { ...prev, ...patch } : prev);
+  };
+
   const login = async (email: string, password: string) => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
@@ -56,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, refreshUser, isLoading }}>
+    <AuthContext.Provider value={{ user, login, logout, refreshUser, updateUser, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -53,12 +53,13 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     req.session.userRole = userPayload.role;
     req.session.userName = userPayload.name;
     req.session.userEmail = userPayload.email;
+    req.session.userPhone = user.phone ?? null;
     req.session.save((saveErr) => {
       if (saveErr) {
         res.status(500).json({ error: "Session save error" });
         return;
       }
-      res.json({ user: userPayload });
+      res.json({ user: { ...userPayload, phone: user.phone ?? null } });
     });
   });
 });
@@ -147,6 +148,7 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
 
   req.session.userName = updated.name;
   req.session.userEmail = updated.email ?? actor.email;
+  req.session.userPhone = updated.phone ?? null;
   req.session.save((err) => {
     if (err) req.log.warn({ err }, "Failed to save session after profile update");
   });
@@ -162,12 +164,12 @@ router.post("/auth/logout", (req, res): void => {
 });
 
 router.get("/auth/me", (req, res): void => {
-  const { userId, userName, userRole, userEmail } = req.session ?? {};
+  const { userId, userName, userRole, userEmail, userPhone } = req.session ?? {};
   if (!userId || !userName || !userRole || !userEmail) {
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
-  res.json({ id: userId, name: userName, role: userRole, email: userEmail });
+  res.json({ id: userId, name: userName, role: userRole, email: userEmail, phone: userPhone ?? null });
 });
 
 export default router;

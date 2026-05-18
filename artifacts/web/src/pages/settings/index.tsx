@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const { toast } = useToast();
   const roleInfo = ROLE_LABELS[user?.role ?? ""] ?? { label: user?.role ?? "", color: "bg-muted text-muted-foreground border-border" };
 
@@ -36,8 +36,8 @@ export default function Settings() {
 
   const { mutate: updateProfile, isPending: isProfilePending } = useUpdateMyProfile({
     mutation: {
-      onSuccess: async () => {
-        await refreshUser();
+      onSuccess: (result) => {
+        updateUser({ name: result.name, email: result.email ?? undefined, phone: result.phone ?? undefined });
         toast({ title: "Profile updated" });
         setEditingProfile(false);
       },

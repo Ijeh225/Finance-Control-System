@@ -6,6 +6,7 @@ declare module "express-session" {
     userRole?: "md" | "treasury" | "payment_assistant";
     userName?: string;
     userEmail?: string;
+    userPhone?: string | null;
   }
 }
 
@@ -17,6 +18,7 @@ declare global {
         name: string;
         role: string;
         email: string;
+        phone?: string | null;
       };
     }
   }
