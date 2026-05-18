@@ -3,6 +3,7 @@ import { and, asc, eq, gte, lt, lte, ne, sql } from "drizzle-orm";
 import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsTable, billAttachmentsTable, walletsTable, walletTransactionsTable, usersTable } from "@workspace/db";
 import { publish } from "../lib/sse-broadcaster.js";
 import { sendMail } from "../lib/mailer.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -29,14 +30,18 @@ async function notify(userId: string, type: string, title: string, body: string,
     id: uid(), userId, type: type as "bill_approved", title, body, billId: billId ?? null
   });
   publish(userId, { type: "new_notification" });
-  // Best-effort email — look up recipient and send; never throws
-  const [recipient] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
-  if (recipient?.email) {
-    // Always include bill reference in email when available so the recipient can identify the bill
-    const emailBody = billId
-      ? `${body}\n\nBill Reference: ${billId.toUpperCase()}\n\nLog in at FinCommand to take action.`
-      : `${body}\n\nLog in at FinCommand to take action.`;
-    await sendMail({ to: recipient.email, subject: `FinCommand: ${title}`, text: emailBody });
+  // Best-effort email — entire email path is guarded so it NEVER breaks the API response
+  try {
+    const [recipient] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+    if (recipient?.email) {
+      const emailBody = billId
+        ? `${body}\n\nBill Reference: ${billId.toUpperCase()}\n\nLog in at FinCommand to take action.`
+        : `${body}\n\nLog in at FinCommand to take action.`;
+      await sendMail({ to: recipient.email, subject: `FinCommand: ${title}`, text: emailBody });
+    }
+  } catch (err) {
+    // Log and continue — email failure must never affect the API response
+    logger.warn({ err, userId, type }, "Email side-path failed — skipping");
   }
 }
 
