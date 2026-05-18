@@ -306,7 +306,7 @@ export default function BillDetail() {
     return (
       <div className="p-10 text-center">
         <p className="text-muted-foreground">Bill not found.</p>
-        <Button variant="outline" onClick={() => setLocation("/bills")} className="mt-4">Back to Bills</Button>
+        <Button variant="outline" onClick={() => window.history.length > 1 ? window.history.back() : setLocation("/bills")} className="mt-4">Go Back</Button>
       </div>
     );
   }
@@ -354,8 +354,8 @@ export default function BillDetail() {
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => setLocation("/bills")} className="text-muted-foreground" data-testid="button-back-bills">
-          <ChevronLeft className="w-4 h-4 mr-1" /> Bills
+        <Button variant="ghost" size="sm" onClick={() => window.history.length > 1 ? window.history.back() : setLocation("/bills")} className="text-muted-foreground" data-testid="button-back-bills">
+          <ChevronLeft className="w-4 h-4 mr-1" /> Back
         </Button>
       </div>
 
