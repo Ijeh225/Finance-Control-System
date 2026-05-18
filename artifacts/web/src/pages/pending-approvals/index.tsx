@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useEffectiveUserId } from "@/context/ViewingAsContext";
 import { useGetPendingApprovals, getGetPendingApprovalsQueryKey } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +26,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function PendingApprovals() {
   const { user } = useAuth();
-  const userId = user?.role !== "md" ? user?.id : undefined;
+  const userId = useEffectiveUserId(user?.role, user?.id);
   const params = userId ? { userId } : undefined;
 
   const { data, isLoading } = useGetPendingApprovals(params, {

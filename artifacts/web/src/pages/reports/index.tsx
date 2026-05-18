@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { useEffectiveUserId } from "@/context/ViewingAsContext";
 import {
   useGetOutstandingLiabilities, getGetOutstandingLiabilitiesQueryKey,
   useGetPendingApprovals, getGetPendingApprovalsQueryKey,
@@ -92,7 +93,7 @@ function ExportButtons({ reportType }: { reportType: string }) {
 
 export default function Reports() {
   const { user } = useAuth();
-  const userId = user?.role !== "md" ? user?.id : undefined;
+  const userId = useEffectiveUserId(user?.role, user?.id);
   const params = userId ? { userId } : undefined;
 
   const { data: outstanding, isLoading: l1 } = useGetOutstandingLiabilities(params, {

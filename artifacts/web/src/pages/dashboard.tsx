@@ -1,6 +1,6 @@
 import { Link } from "wouter";
-import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useViewingAs } from "@/context/ViewingAsContext";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetScheduledToday, getGetScheduledTodayQueryKey,
@@ -41,7 +41,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function Dashboard() {
   const { user } = useAuth();
   const isMd = user?.role === "md";
-  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
+  const { selectedUserId, setSelectedUser, clearSelectedUser } = useViewingAs();
 
   // For non-MD users, always scope to own data. For MD, use the selected assistant (or undefined = all).
   const scopedUserId = isMd ? selectedUserId : user?.id;
@@ -103,7 +103,7 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-2" data-testid="assistant-view-switcher">
             <button
-              onClick={() => setSelectedUserId(undefined)}
+              onClick={clearSelectedUser}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                 !selectedUserId
                   ? "bg-primary text-primary-foreground border-primary"
@@ -116,7 +116,7 @@ export default function Dashboard() {
             {assistants.map(a => (
               <button
                 key={a.id}
-                onClick={() => setSelectedUserId(prev => prev === a.id ? undefined : a.id)}
+                onClick={() => selectedUserId === a.id ? clearSelectedUser() : setSelectedUser(a.id, a.name ?? a.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                   selectedUserId === a.id
                     ? "bg-primary text-primary-foreground border-primary"

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useSearch } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useEffectiveUserId } from "@/context/ViewingAsContext";
 import {
   useListBills, getListBillsQueryKey,
   useCreateBill,
@@ -90,10 +91,11 @@ export default function BillsList() {
     link: "",
   });
 
+  const effectiveUserId = useEffectiveUserId(user?.role, user?.id);
   const queryParams = {
     ...(statusFilter && statusFilter !== "all" ? { status: statusFilter as any } : {}),
     ...(priorityFilter && priorityFilter !== "all" ? { priority: priorityFilter as any } : {}),
-    ...(user?.role !== "md" ? { userId: user?.id } : {}),
+    ...(effectiveUserId ? { userId: effectiveUserId } : {}),
   };
 
   const { data, isLoading } = useListBills(

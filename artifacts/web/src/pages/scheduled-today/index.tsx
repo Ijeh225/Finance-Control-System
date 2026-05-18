@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useEffectiveUserId } from "@/context/ViewingAsContext";
 import {
   useGetScheduledToday, getGetScheduledTodayQueryKey,
   useWithdrawBill, getListBillsQueryKey,
@@ -32,7 +33,7 @@ export default function ScheduledToday() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const isPA = user?.role !== "md";
-  const userId = isPA ? user?.id : undefined;
+  const userId = useEffectiveUserId(user?.role, user?.id);
   const params = userId ? { userId } : undefined;
 
   const { data, isLoading } = useGetScheduledToday(params, {

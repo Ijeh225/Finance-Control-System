@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useViewingAs } from "@/context/ViewingAsContext";
 import { useListNotifications, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   History,
   Menu,
   X,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -51,7 +53,9 @@ function NavItem({ href, icon, label, isActive, badge, onClick }: NavItemProps) 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { selectedUserName, clearSelectedUser } = useViewingAs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isViewingAs = user?.role === "md" && !!selectedUserName;
 
   const { data: notifData } = useListNotifications(
     { userId: user?.id ?? "" },
@@ -203,6 +207,20 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Main content ───────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto md:h-[100dvh]">
+        {isViewingAs && (
+          <div className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-300 text-sm font-medium">
+            <span className="flex items-center gap-2">
+              <Eye className="w-4 h-4 shrink-0" />
+              Viewing as <strong>{selectedUserName}</strong>
+            </span>
+            <button
+              onClick={clearSelectedUser}
+              className="text-xs underline underline-offset-2 hover:no-underline shrink-0"
+            >
+              Back to overview
+            </button>
+          </div>
+        )}
         {children}
       </main>
     </div>

@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useEffectiveUserId } from "@/context/ViewingAsContext";
 import { useGetOverdueBills, getGetOverdueBillsQueryKey } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-rea
 
 export default function OverdueBills() {
   const { user } = useAuth();
-  const userId = user?.role !== "md" ? user?.id : undefined;
+  const userId = useEffectiveUserId(user?.role, user?.id);
   const params = userId ? { userId } : undefined;
 
   const { data, isLoading } = useGetOverdueBills(params, {
