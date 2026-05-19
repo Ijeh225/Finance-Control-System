@@ -34,10 +34,18 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const t = today();
   const tom = tomorrow();
 
-  // Auto-flag pending bills with past scheduled dates as overdue
-  const overdueConditions = [eq(billsTable.status, "pending"), lt(billsTable.scheduledDate, t)];
+  // Auto-reschedule bills with past scheduled dates to tomorrow instead of marking overdue
+  const rescheduleConditions = [
+    inArray(billsTable.status, ["pending", "approved", "on_hold", "partial"]),
+    lt(billsTable.scheduledDate, t),
+  ];
+  if (userId) rescheduleConditions.push(eq(billsTable.createdBy, userId));
+  await db.update(billsTable).set({ scheduledDate: tom }).where(and(...rescheduleConditions));
+
+  // Migrate any existing overdue bills back to pending and reschedule to tomorrow
+  const overdueConditions = [eq(billsTable.status, "overdue")];
   if (userId) overdueConditions.push(eq(billsTable.createdBy, userId));
-  await db.update(billsTable).set({ status: "overdue" }).where(and(...overdueConditions));
+  await db.update(billsTable).set({ status: "pending", scheduledDate: tom }).where(and(...overdueConditions));
 
   const [bills, wallets, notifications] = await Promise.all([
     db.select().from(billsTable).where(userFilter),
@@ -47,12 +55,11 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
       : db.select().from(notificationsTable).where(eq(notificationsTable.isRead, false)),
   ]);
 
-  const actionableStatuses = ["pending", "approved", "partial", "on_hold", "overdue"];
+  const actionableStatuses = ["pending", "approved", "partial", "on_hold"];
   const scheduledToday = bills.filter(b => b.scheduledDate === t && actionableStatuses.includes(b.status ?? ""));
   const scheduledTomorrow = bills.filter(b => b.scheduledDate === tom && actionableStatuses.includes(b.status ?? ""));
   const pending = bills.filter(b => b.status === "pending");
   const approvedUnpaid = bills.filter(b => b.status === "approved");
-  const overdue = bills.filter(b => b.status === "overdue");
   const paidToday = bills.filter(b => b.status === "paid" && b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
   const partial = bills.filter(b => b.status === "partial");
   const paidAllTime = bills.filter(b => b.status === "paid");
@@ -73,8 +80,6 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     approvedUnpaidCount: approvedUnpaid.length,
     approvedUnpaidAmount: sum(approvedUnpaid, "amount"),
     totalOutstandingLiabilities: totalOutstanding,
-    overdueCount: overdue.length,
-    overdueAmount: sum(overdue, "outstandingBalance"),
     totalWalletBalance,
     paidTodayCount: paidToday.length,
     paidTodayAmount: sum(paidToday, "paidAmount"),
@@ -86,7 +91,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   });
 });
 
-const ACTIONABLE_STATUSES = ["pending", "approved", "partial", "on_hold", "overdue"] as const;
+const ACTIONABLE_STATUSES = ["pending", "approved", "partial", "on_hold"] as const;
 
 router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
@@ -114,14 +119,6 @@ router.get("/dashboard/scheduled-tomorrow", async (req, res): Promise<void> => {
   res.json({ bills: bills.map(formatBill), total });
 });
 
-router.get("/dashboard/overdue", async (req, res): Promise<void> => {
-  const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);
-  const conditions = [eq(billsTable.status, "overdue")];
-  if (userId) conditions.push(eq(billsTable.createdBy, userId));
-  const bills = await db.select().from(billsTable).where(and(...conditions));
-  const total = bills.reduce((a, b) => a + parseFloat(String(b.outstandingBalance ?? 0)), 0);
-  res.json({ bills: bills.map(formatBill), total });
-});
 
 router.get("/dashboard/wallet-balances", async (_req, res): Promise<void> => {
   const wallets = await db.select().from(walletsTable);

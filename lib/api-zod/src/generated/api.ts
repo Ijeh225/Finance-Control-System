@@ -33,8 +33,6 @@ export const GetDashboardSummaryResponse = zod.object({
   "approvedUnpaidCount": zod.number(),
   "approvedUnpaidAmount": zod.number(),
   "totalOutstandingLiabilities": zod.number(),
-  "overdueCount": zod.number(),
-  "overdueAmount": zod.number(),
   "totalWalletBalance": zod.number(),
   "paidTodayCount": zod.number(),
   "paidTodayAmount": zod.number(),
@@ -138,13 +136,14 @@ export const GetScheduledTomorrowResponse = zod.object({
 
 
 /**
- * @summary All overdue bills
+ * @deprecated
+ * @summary Deprecated - overdue bills (auto-rescheduled now)
  */
-export const GetOverdueBillsQueryParams = zod.object({
+export const GetOverdueBillsDeprecatedQueryParams = zod.object({
   "userId": zod.coerce.string().optional()
 })
 
-export const GetOverdueBillsResponse = zod.object({
+export const GetOverdueBillsDeprecatedResponse = zod.object({
   "bills": zod.array(zod.object({
   "id": zod.string(),
   "vendorId": zod.string(),

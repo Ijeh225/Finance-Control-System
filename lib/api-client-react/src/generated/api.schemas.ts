@@ -425,8 +425,6 @@ export interface DashboardSummary {
   approvedUnpaidCount: number;
   approvedUnpaidAmount: number;
   totalOutstandingLiabilities: number;
-  overdueCount: number;
-  overdueAmount: number;
   totalWalletBalance: number;
   paidTodayCount: number;
   paidTodayAmount: number;
@@ -513,11 +511,11 @@ export type GetScheduledTomorrow200 = {
   total: number;
 };
 
-export type GetOverdueBillsParams = {
+export type GetOverdueBillsDeprecatedParams = {
 userId?: string;
 };
 
-export type GetOverdueBills200 = {
+export type GetOverdueBillsDeprecated200 = {
   bills: Bill[];
   total: number;
 };

@@ -51,8 +51,8 @@ import type {
   GetDashboardCashflowParams,
   GetDashboardSummaryParams,
   GetOutstandingLiabilitiesParams,
-  GetOverdueBills200,
-  GetOverdueBillsParams,
+  GetOverdueBillsDeprecated200,
+  GetOverdueBillsDeprecatedParams,
   GetPaidToday200,
   GetPaidTodayParams,
   GetPartialPayments200,
@@ -457,7 +457,7 @@ export function useGetScheduledTomorrow<TData = Awaited<ReturnType<typeof getSch
 
 
 
-export const getGetOverdueBillsUrl = (params?: GetOverdueBillsParams,) => {
+export const getGetOverdueBillsDeprecatedUrl = (params?: GetOverdueBillsDeprecatedParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -469,15 +469,16 @@ export const getGetOverdueBillsUrl = (params?: GetOverdueBillsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/dashboard/overdue?${stringifiedParams}` : `/api/dashboard/overdue`
+  return stringifiedParams.length > 0 ? `/api/dashboard/overdue-removed?${stringifiedParams}` : `/api/dashboard/overdue-removed`
 }
 
 /**
- * @summary All overdue bills
+ * @deprecated
+ * @summary Deprecated - overdue bills (auto-rescheduled now)
  */
-export const getOverdueBills = async (params?: GetOverdueBillsParams, options?: RequestInit): Promise<GetOverdueBills200> => {
+export const getOverdueBillsDeprecated = async (params?: GetOverdueBillsDeprecatedParams, options?: RequestInit): Promise<GetOverdueBillsDeprecated200> => {
 
-  return customFetch<GetOverdueBills200>(getGetOverdueBillsUrl(params),
+  return customFetch<GetOverdueBillsDeprecated200>(getGetOverdueBillsDeprecatedUrl(params),
   {
     ...options,
     method: 'GET'
@@ -490,45 +491,46 @@ export const getOverdueBills = async (params?: GetOverdueBillsParams, options?: 
 
 
 
-export const getGetOverdueBillsQueryKey = (params?: GetOverdueBillsParams,) => {
+export const getGetOverdueBillsDeprecatedQueryKey = (params?: GetOverdueBillsDeprecatedParams,) => {
     return [
-    `/api/dashboard/overdue`, ...(params ? [params] : [])
+    `/api/dashboard/overdue-removed`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetOverdueBillsQueryOptions = <TData = Awaited<ReturnType<typeof getOverdueBills>>, TError = ErrorType<unknown>>(params?: GetOverdueBillsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOverdueBills>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetOverdueBillsDeprecatedQueryOptions = <TData = Awaited<ReturnType<typeof getOverdueBillsDeprecated>>, TError = ErrorType<unknown>>(params?: GetOverdueBillsDeprecatedParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOverdueBillsDeprecated>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetOverdueBillsQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getGetOverdueBillsDeprecatedQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOverdueBills>>> = ({ signal }) => getOverdueBills(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOverdueBillsDeprecated>>> = ({ signal }) => getOverdueBillsDeprecated(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOverdueBills>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOverdueBillsDeprecated>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetOverdueBillsQueryResult = NonNullable<Awaited<ReturnType<typeof getOverdueBills>>>
-export type GetOverdueBillsQueryError = ErrorType<unknown>
+export type GetOverdueBillsDeprecatedQueryResult = NonNullable<Awaited<ReturnType<typeof getOverdueBillsDeprecated>>>
+export type GetOverdueBillsDeprecatedQueryError = ErrorType<unknown>
 
 
 /**
- * @summary All overdue bills
+ * @deprecated
+ * @summary Deprecated - overdue bills (auto-rescheduled now)
  */
 
-export function useGetOverdueBills<TData = Awaited<ReturnType<typeof getOverdueBills>>, TError = ErrorType<unknown>>(
- params?: GetOverdueBillsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOverdueBills>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetOverdueBillsDeprecated<TData = Awaited<ReturnType<typeof getOverdueBillsDeprecated>>, TError = ErrorType<unknown>>(
+ params?: GetOverdueBillsDeprecatedParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOverdueBillsDeprecated>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetOverdueBillsQueryOptions(params,options)
+  const queryOptions = getGetOverdueBillsDeprecatedQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

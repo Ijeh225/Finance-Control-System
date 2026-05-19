@@ -5,7 +5,6 @@ import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetScheduledToday, getGetScheduledTodayQueryKey,
   useGetScheduledTomorrow, getGetScheduledTomorrowQueryKey,
-  useGetOverdueBills, getGetOverdueBillsQueryKey,
   useGetRecentActivity, getGetRecentActivityQueryKey,
   useGetWalletBalances, getGetWalletBalancesQueryKey,
   useListUsers, getListUsersQueryKey,
@@ -61,9 +60,6 @@ export default function Dashboard() {
   });
   const { data: scheduledTomorrow, isLoading: tomorrowLoading } = useGetScheduledTomorrow(params, {
     query: { queryKey: getGetScheduledTomorrowQueryKey(params) },
-  });
-  const { data: overdueData, isLoading: overdueLoading } = useGetOverdueBills(params, {
-    query: { queryKey: getGetOverdueBillsQueryKey(params) },
   });
   const { data: activityData, isLoading: activityLoading } = useGetRecentActivity(
     { limit: 15, ...(params ?? {}) },
@@ -216,18 +212,6 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            <Link href="/overdue" className="block group" data-testid="card-overdue">
-              <Card className="shadow-sm border-destructive/20 bg-destructive/5 group-hover:border-destructive/50 transition-colors cursor-pointer h-full">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-destructive">Overdue Bills</CardTitle>
-                  <AlertCircle className="w-4 h-4 text-destructive" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.overdueAmount)}</div>
-                  <p className="text-xs text-muted-foreground font-medium mt-1">{summary.overdueCount} liabilit{summary.overdueCount !== 1 ? "ies" : "y"} past due</p>
-                </CardContent>
-              </Card>
-            </Link>
 
             {/* Row 3 */}
             <Link href="/wallets" className="block group" data-testid="card-wallet-balance">
@@ -453,45 +437,6 @@ export default function Dashboard() {
 
         {/* Right column — 1/3 width */}
         <div className="space-y-6">
-          {/* Overdue Bills */}
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-destructive" /> Overdue
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {overdueLoading ? (
-                <div className="space-y-2 p-4">
-                  {[1,2].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                </div>
-              ) : !overdueData?.bills?.length ? (
-                <div className="p-6 text-center">
-                  <CheckCircle2 className="w-7 h-7 text-emerald-500/40 mx-auto mb-1.5" />
-                  <p className="text-xs text-muted-foreground">No overdue bills.</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {overdueData.bills.slice(0, 4).map(bill => (
-                    <Link key={bill.id} href={`/bills/${bill.id}`}>
-                      <div className="p-3 hover:bg-muted/30 transition-colors cursor-pointer" data-testid={`row-overdue-bill-${bill.id}`}>
-                        <p className="text-sm font-semibold truncate">{bill.vendorName}</p>
-                        <div className="flex items-center justify-between mt-0.5">
-                          <p className="text-xs text-muted-foreground">Due {formatDate(bill.dueDate)}</p>
-                          <p className="text-xs font-bold font-mono text-destructive">{formatCurrency(bill.amount ?? 0)}</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                  {overdueData.bills.length > 4 && (
-                    <div className="p-3 text-center">
-                      <Link href="/bills"><span className="text-xs text-primary font-semibold hover:underline">+{overdueData.bills.length - 4} more</span></Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Wallet Balances */}
           <Card className="shadow-sm">
