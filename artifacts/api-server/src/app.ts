@@ -2,6 +2,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import session from "express-session";
 import pinoHttp from "pino-http";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
@@ -90,6 +92,18 @@ app.use(
 );
 
 app.use("/api", router);
+
+const webDistDir = path.resolve(__dirname, "../../web/dist/public");
+const webIndexFile = path.join(webDistDir, "index.html");
+
+if (existsSync(webIndexFile)) {
+  app.use(express.static(webDistDir));
+  app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(webIndexFile);
+  });
+} else {
+  logger.warn({ webDistDir }, "Web build not found; API-only mode enabled");
+}
 
 seedIfEmpty().catch(err => logger.error({ err }, "Seed error"));
 
