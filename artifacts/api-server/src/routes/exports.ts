@@ -3,6 +3,10 @@ import { and, eq, desc, gt } from "drizzle-orm";
 import { db, billsTable, vendorsTable, walletTransactionsTable, walletsTable } from "@workspace/db";
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
+import { logger, auditLog } from "../lib/logger";
+
+/** Timeout (ms) for export operations — prevents hanging on very large datasets. */
+const EXPORT_TIMEOUT_MS = 60_000;
 
 const router: IRouter = Router();
 
@@ -60,37 +64,62 @@ router.get("/export/reports/:type", async (req, res): Promise<void> => {
     return;
   }
 
-  let bills: (typeof billsTable.$inferSelect)[] = [];
-  let title = "Report";
+  // Abort the export if it takes longer than EXPORT_TIMEOUT_MS
+  const timeoutId = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.error({ userId: actor.id, type, format }, "Export timed out");
+      res.status(504).json({ error: "Export timed out. The dataset may be too large — try filtering by date range." });
+    }
+  }, EXPORT_TIMEOUT_MS);
 
-  if (type === "outstanding-liabilities") {
-    title = "Outstanding Liabilities";
-    const conds = [gt(billsTable.outstandingBalance, "0")];
-    if (userId) conds.push(eq(billsTable.createdBy, userId));
-    bills = await db.select().from(billsTable).where(and(...conds)).orderBy(desc(billsTable.createdAt));
-  } else if (type === "pending-approvals") {
-    title = "Pending Approvals";
-    const conds = [eq(billsTable.status, "pending")];
-    if (userId) conds.push(eq(billsTable.createdBy, userId));
-    bills = await db.select().from(billsTable).where(and(...conds));
-  } else if (type === "paid-today") {
-    title = "Paid Today";
-    const t = today();
-    const conds = [eq(billsTable.status, "paid")];
-    if (userId) conds.push(eq(billsTable.createdBy, userId));
-    const all = await db.select().from(billsTable).where(and(...conds));
-    bills = all.filter(b => b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
-  } else if (type === "partial-payments") {
-    title = "Partial Payments";
-    const conds = [eq(billsTable.status, "partial")];
-    if (userId) conds.push(eq(billsTable.createdBy, userId));
-    bills = await db.select().from(billsTable).where(and(...conds));
-  }
+  try {
+    let bills: (typeof billsTable.$inferSelect)[] = [];
+    let title = "Report";
 
-  if (format === "pdf") {
-    await sendBillsPdf(res, title, bills);
-  } else {
-    await sendBillsExcel(res, title, bills);
+    if (type === "outstanding-liabilities") {
+      title = "Outstanding Liabilities";
+      const conds = [gt(billsTable.outstandingBalance, "0")];
+      if (userId) conds.push(eq(billsTable.createdBy, userId));
+      bills = await db.select().from(billsTable).where(and(...conds)).orderBy(desc(billsTable.createdAt));
+    } else if (type === "pending-approvals") {
+      title = "Pending Approvals";
+      const conds = [eq(billsTable.status, "pending")];
+      if (userId) conds.push(eq(billsTable.createdBy, userId));
+      bills = await db.select().from(billsTable).where(and(...conds));
+    } else if (type === "paid-today") {
+      title = "Paid Today";
+      const t = today();
+      const conds = [eq(billsTable.status, "paid")];
+      if (userId) conds.push(eq(billsTable.createdBy, userId));
+      const all = await db.select().from(billsTable).where(and(...conds));
+      bills = all.filter(b => b.updatedAt && b.updatedAt.toISOString().split("T")[0] === t);
+    } else if (type === "partial-payments") {
+      title = "Partial Payments";
+      const conds = [eq(billsTable.status, "partial")];
+      if (userId) conds.push(eq(billsTable.createdBy, userId));
+      bills = await db.select().from(billsTable).where(and(...conds));
+    }
+
+    auditLog("export.generated", {
+      userId: actor.id,
+      userRole: actor.role,
+      ip: req.ip,
+      resource: "report",
+      details: { type, format, recordCount: bills.length },
+    });
+
+    if (format === "pdf") {
+      await sendBillsPdf(res, title, bills);
+    } else {
+      await sendBillsExcel(res, title, bills);
+    }
+  } catch (err) {
+    logger.error({ err, userId: actor.id, type, format }, "Report export failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Export failed. Please try again or contact support if the problem persists." });
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 
@@ -214,20 +243,45 @@ router.get("/export/vendors/:id/statement", async (req, res): Promise<void> => {
   const vendorId = req.params["id"];
   const format = (req.query["format"] as string) || "excel";
 
-  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
-  if (!vendor) {
-    res.status(404).json({ error: "Vendor not found" });
-    return;
-  }
+  const timeoutId = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.error({ userId: actor.id, vendorId, format }, "Vendor statement export timed out");
+      res.status(504).json({ error: "Export timed out. Please try again." });
+    }
+  }, EXPORT_TIMEOUT_MS);
 
-  const conds = [eq(billsTable.vendorId, vendorId)];
-  if (actor.role !== "md") conds.push(eq(billsTable.createdBy, actor.id));
-  const bills = await db.select().from(billsTable).where(and(...conds));
+  try {
+    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+    if (!vendor) {
+      res.status(404).json({ error: "Vendor not found" });
+      return;
+    }
 
-  if (format === "pdf") {
-    await sendVendorPdf(res, vendor, bills);
-  } else {
-    await sendVendorExcel(res, vendor, bills);
+    const conds = [eq(billsTable.vendorId, vendorId)];
+    if (actor.role !== "md") conds.push(eq(billsTable.createdBy, actor.id));
+    const bills = await db.select().from(billsTable).where(and(...conds));
+
+    auditLog("export.generated", {
+      userId: actor.id,
+      userRole: actor.role,
+      ip: req.ip,
+      resource: "vendor_statement",
+      resourceId: vendorId,
+      details: { format, recordCount: bills.length, vendorName: vendor.name },
+    });
+
+    if (format === "pdf") {
+      await sendVendorPdf(res, vendor, bills);
+    } else {
+      await sendVendorExcel(res, vendor, bills);
+    }
+  } catch (err) {
+    logger.error({ err, userId: actor.id, vendorId, format }, "Vendor statement export failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Export failed. Please try again or contact support." });
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 
@@ -353,25 +407,50 @@ router.get("/export/wallets/:id/statement", async (req, res): Promise<void> => {
   const walletId = req.params["id"];
   const format = (req.query["format"] as string) || "excel";
 
-  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, walletId));
-  if (!wallet) {
-    res.status(404).json({ error: "Wallet not found" });
-    return;
-  }
-  if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
+  const timeoutId = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.error({ userId: actor.id, walletId, format }, "Wallet statement export timed out");
+      res.status(504).json({ error: "Export timed out. Please try again." });
+    }
+  }, EXPORT_TIMEOUT_MS);
 
-  const txns = await db.select()
-    .from(walletTransactionsTable)
-    .where(eq(walletTransactionsTable.walletId, walletId))
-    .orderBy(desc(walletTransactionsTable.createdAt));
+  try {
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.id, walletId));
+    if (!wallet) {
+      res.status(404).json({ error: "Wallet not found" });
+      return;
+    }
+    if (actor.role !== "md" && wallet.ownedBy !== actor.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
-  if (format === "pdf") {
-    await sendWalletPdf(res, wallet, txns);
-  } else {
-    await sendWalletExcel(res, wallet, txns);
+    const txns = await db.select()
+      .from(walletTransactionsTable)
+      .where(eq(walletTransactionsTable.walletId, walletId))
+      .orderBy(desc(walletTransactionsTable.createdAt));
+
+    auditLog("export.generated", {
+      userId: actor.id,
+      userRole: actor.role,
+      ip: req.ip,
+      resource: "wallet_statement",
+      resourceId: walletId,
+      details: { format, recordCount: txns.length, walletName: wallet.name },
+    });
+
+    if (format === "pdf") {
+      await sendWalletPdf(res, wallet, txns);
+    } else {
+      await sendWalletExcel(res, wallet, txns);
+    }
+  } catch (err) {
+    logger.error({ err, userId: actor.id, walletId, format }, "Wallet statement export failed");
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Export failed. Please try again or contact support." });
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 

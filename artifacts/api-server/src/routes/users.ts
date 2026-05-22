@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response, type NextFunction } 
 import { eq } from "drizzle-orm";
 import { db, usersTable, walletsTable, billsTable } from "@workspace/db";
 import bcrypt from "bcryptjs";
+import { auditLog } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -133,6 +134,16 @@ router.post("/users", requireMd, async (req, res): Promise<void> => {
     .insert(usersTable)
     .values({ id: uid(), name, role, email, phone, passwordHash, isActive: true })
     .returning(safeUserColumns);
+
+  auditLog("data.create", {
+    userId: req.user!.id,
+    userRole: req.user!.role,
+    ip: req.ip,
+    resource: "user",
+    resourceId: inserted!.id,
+    details: { name, role },
+  });
+
   res.status(201).json(inserted);
 });
 
@@ -156,6 +167,16 @@ router.patch("/users/:id", requireMd, async (req, res): Promise<void> => {
 
   const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning(safeUserColumns);
   if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+
+  auditLog("data.update", {
+    userId: req.user!.id,
+    userRole: req.user!.role,
+    ip: req.ip,
+    resource: "user",
+    resourceId: id,
+    details: { fields: Object.keys(updates).filter(k => k !== "passwordHash") },
+  });
+
   res.json(updated);
 });
 
@@ -231,6 +252,16 @@ router.post("/users/:id/reset-password", requireMd, async (req, res): Promise<vo
     .where(eq(usersTable.id, id))
     .returning(safeUserColumns);
   if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+
+  auditLog("auth.password_reset", {
+    userId: actor.id,
+    userRole: actor.role,
+    ip: req.ip,
+    resource: "user",
+    resourceId: id,
+    details: { resetBy: actor.id },
+  });
+
   res.json({ success: true });
 });
 
