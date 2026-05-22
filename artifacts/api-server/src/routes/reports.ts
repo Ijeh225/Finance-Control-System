@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { db, billsTable, vendorsTable } from "@workspace/db";
+import { reportCache, ReportCache } from "../lib/cache";
 
 const router: IRouter = Router();
 
@@ -34,6 +35,10 @@ function formatBill(b: Record<string, unknown>) {
 router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const { from, to } = req.query as { from?: string; to?: string };
+
+  const cacheKey = reportCache.buildKey(userId ?? "all", "outstanding-liabilities", from && to ? `${from}:${to}` : undefined);
+  const cached = reportCache.get(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   const conds: ReturnType<typeof eq>[] = [sql`${billsTable.outstandingBalance} > 0` as unknown as ReturnType<typeof eq>];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
@@ -77,12 +82,18 @@ router.get("/reports/outstanding-liabilities", async (req, res): Promise<void> =
 
   const byUser = [...userMap.entries()].map(([uid, u]) => ({ userId: uid, userName: u.name, total: u.total }));
 
-  res.json({ totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser, bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)) });
+  const result = { totalOutstanding, aging0to7, aging8to14, aging15to30, aging30plus, byVendor, byUser, bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)) };
+  reportCache.set(cacheKey, result, ReportCache.DETAILED_TTL_MS);
+  res.json(result);
 });
 
 router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const { from, to } = req.query as { from?: string; to?: string };
+
+  const cacheKey = reportCache.buildKey(userId ?? "all", "pending-approvals", from && to ? `${from}:${to}` : undefined);
+  const cached = reportCache.get(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   const conds = [eq(billsTable.status, "pending")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
@@ -91,12 +102,18 @@ router.get("/reports/pending-approvals", async (req, res): Promise<void> => {
 
   const bills = await db.select().from(billsTable).where(and(...conds));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.amount)), 0);
-  res.json({ bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: bills.length });
+  const result = { bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: bills.length };
+  reportCache.set(cacheKey, result, ReportCache.DETAILED_TTL_MS);
+  res.json(result);
 });
 
 router.get("/reports/paid-today", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const { from, to } = req.query as { from?: string; to?: string };
+
+  const cacheKey = reportCache.buildKey(userId ?? "all", "paid-today", from && to ? `${from}:${to}` : today());
+  const cached = reportCache.get(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   const conds = [eq(billsTable.status, "paid")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
@@ -118,12 +135,19 @@ router.get("/reports/paid-today", async (req, res): Promise<void> => {
   }
 
   const total = filtered.reduce((a, b) => a + parseFloat(String(b.paidAmount ?? 0)), 0);
-  res.json({ bills: filtered.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: filtered.length });
+  const result = { bills: filtered.map(b => formatBill(b as unknown as Record<string, unknown>)), total, count: filtered.length };
+  // Paid-today data changes frequently — use dashboard TTL (5 min)
+  reportCache.set(cacheKey, result, ReportCache.DASHBOARD_TTL_MS);
+  res.json(result);
 });
 
 router.get("/reports/partial-payments", async (req, res): Promise<void> => {
   const userId = resolveUserId(req as Parameters<typeof resolveUserId>[0]);
   const { from, to } = req.query as { from?: string; to?: string };
+
+  const cacheKey = reportCache.buildKey(userId ?? "all", "partial-payments", from && to ? `${from}:${to}` : undefined);
+  const cached = reportCache.get(cacheKey);
+  if (cached) { res.json(cached); return; }
 
   const conds = [eq(billsTable.status, "partial")];
   if (userId) conds.push(eq(billsTable.createdBy, userId));
@@ -132,7 +156,9 @@ router.get("/reports/partial-payments", async (req, res): Promise<void> => {
 
   const bills = await db.select().from(billsTable).where(and(...conds));
   const total = bills.reduce((a, b) => a + parseFloat(String(b.outstandingBalance ?? 0)), 0);
-  res.json({ bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total });
+  const result = { bills: bills.map(b => formatBill(b as unknown as Record<string, unknown>)), total };
+  reportCache.set(cacheKey, result, ReportCache.DETAILED_TTL_MS);
+  res.json(result);
 });
 
 export default router;

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { requireAuth } from "../lib/requireAuth";
+import { auditLog } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -21,17 +22,20 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     .limit(1);
 
   if (!user || !user.passwordHash) {
+    auditLog("auth.login_failed", { ip: req.ip, details: { email: email.toLowerCase().trim(), reason: "user_not_found" } });
     res.status(401).json({ error: "Invalid email or password" });
     return;
   }
 
   if (!user.isActive) {
+    auditLog("auth.login_failed", { userId: user.id, ip: req.ip, details: { reason: "account_deactivated" } });
     res.status(403).json({ error: "Your account has been deactivated. Contact the MD." });
     return;
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
+    auditLog("auth.login_failed", { userId: user.id, ip: req.ip, details: { reason: "invalid_password" } });
     res.status(401).json({ error: "Invalid email or password" });
     return;
   }
@@ -59,6 +63,12 @@ router.post("/auth/login", async (req, res): Promise<void> => {
         res.status(500).json({ error: "Session save error" });
         return;
       }
+      auditLog("auth.login", {
+        userId: userPayload.id,
+        userRole: userPayload.role,
+        ip: req.ip,
+        resource: "session",
+      });
       res.json({ user: { ...userPayload, phone: user.phone ?? null } });
     });
   });
@@ -96,6 +106,13 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, userId));
+
+  auditLog("auth.password_changed", {
+    userId,
+    ip: req.ip,
+    resource: "user",
+    resourceId: userId,
+  });
 
   res.json({ success: true });
 });
@@ -157,7 +174,9 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/auth/logout", (req, res): void => {
+  const userId = req.session?.userId;
   req.session.destroy(() => {
+    auditLog("auth.logout", { userId, ip: req.ip });
     res.clearCookie("fincommand.sid");
     res.json({ ok: true });
   });

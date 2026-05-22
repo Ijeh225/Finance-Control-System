@@ -4,6 +4,7 @@ import { db, billsTable, commentsTable, auditTable, vendorsTable, notificationsT
 import { publish } from "../lib/sse-broadcaster.js";
 import { sendMail } from "../lib/mailer.js";
 import { logger } from "../lib/logger.js";
+import { reportCache } from "../lib/cache.js";
 
 const router: IRouter = Router();
 
@@ -146,6 +147,10 @@ router.post("/bills", async (req, res): Promise<void> => {
       `${actor.name} submitted a new bill for ${vendorName} — ${fmtAmount}. Scheduled: ${scheduledDate}.`,
       bill!.id)
   ));
+
+  // Invalidate report caches for this user and all MD-level views
+  reportCache.invalidateForUser(actor.id);
+  reportCache.invalidateForUser("all");
 
   res.status(201).json(formatBill(bill as unknown as Record<string, unknown>));
 });
@@ -449,6 +454,12 @@ router.post("/bills/:id/pay", async (req, res): Promise<void> => {
   }
 
   req.log.info({ billId: rawId, actor: actor.id, amount: payAmount, wallet: wallet.id, ref }, "Payment processed");
+
+  // Invalidate report caches — payment changes outstanding balances and paid-today
+  reportCache.invalidateForUser(actor.id);
+  reportCache.invalidateForUser(existing.createdBy);
+  reportCache.invalidateForUser("all");
+
   res.json(formatBill(bill as unknown as Record<string, unknown>));
 });
 

@@ -8,6 +8,11 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
 import { DrizzleSessionStore } from "./lib/session-store";
+import { generalLimiter, authLimiter, exportLimiter } from "./lib/rateLimiter";
+import { errorHandler } from "./lib/errorHandler";
+import { monitoringMiddleware, renderPrometheusMetrics } from "./lib/monitoring";
+import { registerSwagger } from "./lib/swagger";
+import { scheduleBackups } from "./lib/backup";
 
 if (!process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable is required");
@@ -42,6 +47,9 @@ app.use(
     },
   }),
 );
+
+// Response-time and error-rate tracking — must come early so all routes are measured
+app.use(monitoringMiddleware);
 
 // Build an explicit origin allowlist from REPLIT_DOMAINS (comma-separated).
 // Falls back to ALLOWED_ORIGINS for local/custom overrides.
@@ -91,6 +99,24 @@ app.use(
   }),
 );
 
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// Auth endpoints: 10 req / 15 min (brute-force protection)
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/logout", authLimiter);
+app.use("/api/auth/change-password", authLimiter);
+
+// Export endpoints: 5 req / 15 min (heavy report generation)
+app.use("/api/export", exportLimiter);
+
+// All other API endpoints: 100 req / 15 min
+app.use("/api", generalLimiter);
+
+// ─── Prometheus metrics (unauthenticated — restrict at infra level if needed) ─
+app.get("/api/metrics", (_req, res) => {
+  res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+  res.send(renderPrometheusMetrics());
+});
+
 app.use("/api", router);
 
 const webDistDir = path.resolve(__dirname, "../../web/dist/public");
@@ -106,5 +132,14 @@ if (existsSync(webIndexFile)) {
 }
 
 seedIfEmpty().catch(err => logger.error({ err }, "Seed error"));
+
+// ─── Centralized error handler (must be last middleware) ──────────────────────
+app.use(errorHandler);
+
+// ─── API documentation (async — non-blocking) ─────────────────────────────────
+registerSwagger(app).catch(err => logger.warn({ err }, "Swagger registration failed"));
+
+// ─── Database backup scheduling ───────────────────────────────────────────────
+scheduleBackups();
 
 export default app;
