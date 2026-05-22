@@ -18,7 +18,7 @@ interface CacheEntry<T> {
  * Call invalidateForUser(userId) whenever bills, wallets, or vendors change
  * for that user so stale data is never served.
  */
-class ReportCache {
+export class ReportCache {
   private readonly store = new Map<string, CacheEntry<unknown>>();
 
   /** TTL in milliseconds for dashboard-level summaries. */
