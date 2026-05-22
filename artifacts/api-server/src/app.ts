@@ -117,6 +117,11 @@ app.get("/api/metrics", (_req, res) => {
   res.send(renderPrometheusMetrics());
 });
 
+// ─── API documentation (async — non-blocking) ─────────────────────────────────
+// Registered BEFORE the authenticated router so /api/docs and /api/docs.json
+// are public routes and not gated by requireAuth.
+registerSwagger(app).catch(err => logger.warn({ err }, "Swagger registration failed"));
+
 app.use("/api", router);
 
 const webDistDir = path.resolve(__dirname, "../../web/dist/public");
@@ -135,9 +140,6 @@ seedIfEmpty().catch(err => logger.error({ err }, "Seed error"));
 
 // ─── Centralized error handler (must be last middleware) ──────────────────────
 app.use(errorHandler);
-
-// ─── API documentation (async — non-blocking) ─────────────────────────────────
-registerSwagger(app).catch(err => logger.warn({ err }, "Swagger registration failed"));
 
 // ─── Database backup scheduling ───────────────────────────────────────────────
 scheduleBackups();
