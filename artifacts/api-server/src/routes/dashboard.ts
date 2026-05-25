@@ -55,7 +55,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
       : db.select().from(notificationsTable).where(eq(notificationsTable.isRead, false)),
   ]);
 
-  const actionableStatuses = ["pending", "approved", "partial", "on_hold"];
+  const actionableStatuses = ["pending", "approved", "on_hold"];
   const scheduledToday = bills.filter(b => b.scheduledDate === t && actionableStatuses.includes(b.status ?? ""));
   const scheduledTomorrow = bills.filter(b => b.scheduledDate === tom && actionableStatuses.includes(b.status ?? ""));
   const pending = bills.filter(b => b.status === "pending");
@@ -91,7 +91,7 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   });
 });
 
-const ACTIONABLE_STATUSES = ["pending", "approved", "partial", "on_hold"] as const;
+const ACTIONABLE_STATUSES = ["pending", "approved", "on_hold"] as const;
 
 router.get("/dashboard/scheduled-today", async (req, res): Promise<void> => {
   const userId = effectiveUserId(req as Parameters<typeof effectiveUserId>[0]);

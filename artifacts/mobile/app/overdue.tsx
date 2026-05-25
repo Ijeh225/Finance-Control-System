@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Platform, Pressable } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
-import { useGetOverdueBills, getGetOverdueBillsQueryKey, useEscalateBill } from '@workspace/api-client-react';
+import { useGetOverdueBillsDeprecated, getGetOverdueBillsDeprecatedQueryKey, useEscalateBill } from '@workspace/api-client-react';
 import { useUser } from '@/context/UserContext';
 import { BillCard } from '@/components/finance/BillCard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,9 +12,9 @@ export default function OverdueBillsScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useUser();
 
-  const { data, isLoading, refetch } = useGetOverdueBills(
+  const { data, isLoading, refetch } = useGetOverdueBillsDeprecated(
     { userId: userId === 'all' ? undefined : userId },
-    { query: { queryKey: getGetOverdueBillsQueryKey({ userId: userId === 'all' ? undefined : userId }) } }
+    { query: { queryKey: getGetOverdueBillsDeprecatedQueryKey({ userId: userId === 'all' ? undefined : userId }) } }
   );
 
   const escalateMutation = useEscalateBill();

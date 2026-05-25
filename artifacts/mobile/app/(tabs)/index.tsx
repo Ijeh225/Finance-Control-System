@@ -162,8 +162,6 @@ export default function DashboardScreen() {
     { label: 'Tomorrow', count: summary?.scheduledTomorrowCount, amount: summary?.scheduledTomorrowAmount, route: '/scheduled-tomorrow' },
     { label: 'Pending Approval', count: summary?.pendingApprovalCount, amount: summary?.pendingApprovalAmount, route: '/pending-approvals', highlight: true },
     { label: 'Approved Unpaid', count: summary?.approvedUnpaidCount, amount: summary?.approvedUnpaidAmount, route: '/bills?status=approved' },
-    { label: 'Outstanding Liabilities', amount: summary?.totalOutstandingLiabilities, route: '/outstanding', fullWidth: true },
-    { label: 'Overdue Bills', count: summary?.overdueCount, amount: summary?.overdueAmount, route: '/overdue', alert: true },
     { label: 'Wallet Balances', amount: summary?.totalWalletBalance, route: '/(tabs)/wallets', success: true },
     { label: 'Paid Today', count: summary?.paidTodayCount, amount: summary?.paidTodayAmount, route: '/bills?status=paid', success: true },
     { label: 'Partial Payments', count: summary?.partialPaymentsCount, route: '/bills?status=partial' },
@@ -233,9 +231,7 @@ export default function DashboardScreen() {
                 style={[
                   styles.card,
                   { backgroundColor: colors.card, borderColor: colors.border },
-                  card.fullWidth && styles.fullWidthCard,
                   card.highlight && { borderColor: colors.primary, borderWidth: 2 },
-                  card.alert && { borderColor: colors.destructive },
                 ]}
               >
                 <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>{card.label}</Text>
@@ -245,7 +241,7 @@ export default function DashboardScreen() {
                     variant="large"
                     style={[
                       styles.cardAmount,
-                      { color: card.success ? colors.success : card.alert ? colors.destructive : colors.foreground }
+                      { color: card.success ? colors.success : colors.foreground }
                     ]}
                   />
                 )}
@@ -378,9 +374,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: 4,
-  },
-  fullWidthCard: {
-    width: '100%',
   },
   cardLabel: {
     fontSize: 12,

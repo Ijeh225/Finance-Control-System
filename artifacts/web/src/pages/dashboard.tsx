@@ -17,7 +17,7 @@ import { formatCurrency, formatDateTime, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, AlertCircle, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3, Users, History } from "lucide-react";
+import { Activity, Clock, Wallet, CheckCircle2, CalendarClock, ArrowRight, User, DollarSign, SplitSquareHorizontal, BarChart3, Users, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -128,10 +128,10 @@ export default function Dashboard() {
       )}
 
 
-      {/* Summary Cards — 9-card KPI grid */}
+      {/* Summary Cards — 8-card KPI grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {summaryLoading || !summary ? (
-          Array.from({ length: 9 }).map((_, i) => (
+          Array.from({ length: 8 }).map((_, i) => (
             <Card key={i} className="shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <Skeleton className="h-4 w-28" />
@@ -198,20 +198,6 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </Link>
-
-            <Link href="/outstanding" className="block group" data-testid="card-outstanding">
-              <Card className="shadow-sm border-rose-500/20 bg-rose-500/5 group-hover:border-rose-500/40 transition-colors cursor-pointer h-full">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-rose-700">Outstanding Liabilities</CardTitle>
-                  <BarChart3 className="w-4 h-4 text-rose-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold font-mono">{formatCurrency(summary.totalOutstandingLiabilities)}</div>
-                  <p className="text-xs text-muted-foreground font-medium mt-1">Total unpaid vendor debt</p>
-                </CardContent>
-              </Card>
-            </Link>
-
 
             {/* Row 3 */}
             <Link href="/wallets" className="block group" data-testid="card-wallet-balance">
